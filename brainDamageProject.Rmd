@@ -30,13 +30,10 @@ hospital <- read_csv2("data.csv")
 dates <- hospital$`Дата перевода в ФНКРР`[c(303:357)] # даты в неподходящем формате для конвертации
 
 # замена опечатки [191] "09.11..2018 0:00" 
-hospital_data$`Дата перевода в ФНКРР`[191] <- "09-11-2018"
+hospital$`Дата перевода в ФНКРР`[191] <- "09-11-2018"
 
-hospital_data <- hospital %>% mutate(`Дата мозговой катастрофы` = format(as.Date(as.Date("1899-12-30") + as.numeric(`Дата мозговой катастрофы`), "%d-%m-%Y"), "%d-%m-%Y"),
+hospital_data <- hospital %>% mutate(`Дата мозговой катастрофы` = as.Date(as.Date("1899-12-30") + as.numeric(`Дата мозговой катастрофы`), "%d-%m-%Y"), "%d-%m-%Y"),
                      `Дата перевода в ФНКРР` = format(as.Date(as.Date("1899-12-30") + as.numeric(`Дата перевода в ФНКРР`), "%d-%m-%Y"), "%d-%m-%Y"))
-
-hospital_data$`Пол`
-hospital_data %>% filter (str_detect(`Пол`, "м"))
 
 ```
 ```{r}
@@ -109,7 +106,8 @@ hospital_renamed <- data %>% rename ("Номер" = "№ истории", "Но�
 "Койко-дни_ФНКЦРР" = "Койко-дней в ФНКЦ РР",
 "Исход" = "Исход, 0 -выписан, 1 умер, 2 - цензура",
 "Пневмония_возникшая_ФНКЦРР" = "Пневмония возникшая в ФНКЦ РР") %>% 
-  rename_at(vars(44 : 148), ~str_replace_all(., "\\s+", "_"))
+  rename_at(vars(44 : 148), ~str_replace_all(., "\\s+", "_"))  %>% 
+  mutate(across(`Возраст`, as.integer))
 
 
 
@@ -141,11 +139,14 @@ noquote(colnames (hospital_renamed))
 ```{r }
 
 hospital_days_var <- hospital_renamed %>% mutate (`До_перевода_ФКЦРР_д` = as.Date(hospital_renamed $`Дата_перевода_ФНКЦРР` , format="%d-%m-%Y")- as.Date(hospital_renamed $`Дата_мозговой_катастрофы`, format="%d-%m-%Y")) %>% mutate(`Потребность_ИВЛ` = ifelse(`Потребность_ИВЛ` =="н/д", NA, `Потребность_ИВЛ`), `Исход` = ifelse( `Исход` == 2, NA, `Исход`),
- `Пол` = case_when(`Пол` == 'ж' ~ 'Ж', `Пол` == 'м' ~ 'М', .default = `Пол`))
+ `Пол` = case_when(`Пол` == 'ж' ~ 'Ж', `Пол` == 'м' ~ 'М', .default = `Пол`),
+ `Пневмония` = case_when(`Пневмония` == 1 ~ "Eсть", `Пневмония` == 0 ~ "Нет", TRUE ~ NA),
+ `Инфекция` = case_when(grepl("1",`Инфекция` ) ~ "Eсть", `Инфекция` == 0 ~ "Нет", TRUE ~ NA)) 
+
 #hospital_days_var <- lapply(hospital_days_var, function(x) replace(x, 'н/д', NA))
 
 	
-hospital_days_var$Пневмония 
+hospital_days_var$Инфекция 
 hospital_days_var$Исход
   
 #date1 <- as.numeric(hospital$`Дата мозговой катастрофы`)
@@ -386,35 +387,6 @@ ans
 plot(ans)
 ```
 
-СОСТОЯНИЕ ПАЦИЕНТОВ В ТОЧКЕ 0
-
-```{r}
-#ПОЛ
-ggplot(hospital_days_var) +
-  geom_bar (aes(`Пол`))
-
-#ВОЗРАСТ
-ggplot(hospital_days_var) +
-  geom_histogram (aes(`Возраст`)) # ОШИБКА
-
-#ПНЕВМОНИЯ
-ggplot(hospital_days_var) +
-  geom_bar (aes(`Пневмония`))
-
-#ПНЕВМОНИЯ
-ggplot(hospital_days_var) +
-  geom_bar (aes(`Инфекция`))
-
-#SOFA
-ggplot(hospital_days_var) +
-  geom_bar (aes(`SOFA_1d`))
-
-ggplot(hospital_days_var) +
-  geom_bar (aes(`Индекс_коморбидности_Чарлсона_1d`))
-
-```
-
-
 
 ### Устин
 
@@ -581,4 +553,97 @@ cuminc(Surv(time, status) ~ diseaseGroup, forcrmp) %>%
   ggcuminc(c('Смерть', 'Выписка')) +
   scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))+
   add_risktable()
+```
+
+### ЛЕНА Графики состояния пациентов в точке 0
+
+```{r fig.width= 10, fig.height=8}
+
+#colnames(data)
+
+theme_cust <- theme(
+    axis.text.x = element_text(size = 14, face = 'bold'),
+    axis.text.y = element_text(size = 14),
+    axis.title = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = 'black'),
+    plot.background = element_rect(fill = "white"),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_line(color = "lightgray"),
+    strip.text = element_text(size = 14)
+  )
+
+#ПОЛ
+ggplot(data %>% filter(!is.na(`Пол`))) +
+  geom_bar(aes(y = diseaseGroup))+
+  facet_wrap(~`Пол`, ncol = 1) +
+  scale_y_discrete('Группа диагнозов') +
+  scale_x_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+  
+
+#ВОЗРАСТ
+
+ggplot(data) +
+  geom_histogram (aes(`Возраст`)) + 
+  facet_wrap(~diseaseGroup) +
+  scale_y_discrete('Группа диагнозов') +
+  scale_x_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+ggplot(data %>% filter(!is.na(`Пол`))) +
+  geom_pointrange(mapping = aes(y = diseaseGroup , x = `Возраст`),
+                  stat = "summary",
+                  fun.min = function(z) {quantile(z,0.25)},
+                  fun.max = function(z) {quantile(z,0.75)},
+                  fun = median, 
+                  size = 1) +
+  facet_wrap(~`Пол`, ncol = 1) +
+  scale_y_discrete('Группа диагнозов') +
+  scale_x_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+
+#ПНЕВМОНИЯ
+data$Пол
+ggplot(data) +
+  geom_bar (aes(`Пневмония`)) +
+  facet_wrap(~diseaseGroup) +
+  scale_y_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+
+#ИНФЕКЦИЯ ПРИ ПОСТУПЛЕНИИ
+ggplot(data) +
+  geom_bar (aes(`Инфекция`)) +
+  facet_wrap(~diseaseGroup) +
+  scale_y_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+#SOFA
+ggplot(data) +
+  geom_bar (aes(`SOFA_1d`)) +
+  facet_wrap(~diseaseGroup) +
+  scale_x_discrete('балл SOFA') +
+  scale_y_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+#Индекс_коморбидности_Чарлсона_1d
+ggplot(data) +
+  geom_bar (aes(`Индекс_коморбидности_Чарлсона_1d`)) +
+  facet_wrap(~diseaseGroup) +
+  scale_x_discrete('ндекс коморбидности Чарлсона 1d') +
+  scale_y_continuous('Количество пациентов') +
+  theme_light() +
+  theme_cust
+
+#write.csv(data,"data250124.csv", row.names = T) 
+
 ```
