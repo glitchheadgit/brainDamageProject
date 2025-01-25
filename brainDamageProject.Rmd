@@ -16,6 +16,7 @@ library(tidycmprsk)
 library(ggsurvfit)
 library(anytime)
 library(SNPassoc)
+library(aod)
 ```
 
 ## R Markdown
@@ -27,22 +28,21 @@ library(SNPassoc)
 ДЛЯ ДАТЫ ПЕРЕВОДА В ФНКРР для пациента 21 опечатка 6 NA
 
 ```{r cars}
-hospital <- read_csv2("data.csv")
-dates <- hospital$`Дата перевода в ФНКРР`[c(303:357)] # даты в неподходящем формате для конвертации
+data <- read_csv2("data.csv")
 
-hospital$`Дата перевода в ФНКРР`[191] <- "09.11.2018"
-hospital$`Дата мозговой катастрофы`[8] <- "01.01.2014"
-hospital$`Дата мозговой катастрофы`[169] <- "12.09.2017"
-hospital$`Дата мозговой катастрофы`[321] <- "01.01.2014"
+data$`Дата перевода в ФНКРР`[191] <- "09.11.2018"
+data$`Дата мозговой катастрофы`[8] <- "01.01.2014"
+data$`Дата мозговой катастрофы`[169] <- "12.09.2017"
+data$`Дата мозговой катастрофы`[321] <- "01.01.2014"
 
-hospital_data <- hospital %>% mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`),
+data <- hospital %>% mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`),
                      `Дата перевода в ФНКРР` = dmy(substr(`Дата перевода в ФНКРР`, start=1, stop=8)),
                      `Дата выписки из ФНКЦ РР` = dmy(`Дата выписки из ФНКЦ РР`)
                      )
 
 ```
 ```{r}
-data <- hospital_data %>%
+data <- data %>%
   mutate(across(everything(), ~na_if(as.character(.), "н/д")))
 target_columns <- c("внкДНК, нг/мл 1d", "8ohdg на миллион оснований 1d",
                     "внкДНК, нг/мл 5d", "8ohdg на миллион оснований 5d")
@@ -78,11 +78,11 @@ data
 ```
 
 ```{r}
-colnames (hospital)
+colnames (data)
 ```
 
 ```{r}
-hospital_renamed <- data %>% rename ("Номер" = "№ истории", "Номер_референс" = "Номер Настя", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP_rs3736309" = "AQP rs3736309",  "анти-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "Дата_мозговой_катастрофы" = "Дата мозговой катастрофы" , "Основной_диагноз_код_МКБ10" = "Основной диагноз код МКБ10", "Диагноз" = "Диагноз целиком", "Дата_перевода_ФНКЦРР" = "Дата перевода в ФНКРР", "Пневмония" = "Поступил в ФНКЦ с пневмонией", "Инфекция"  = "Поступил в ФКНЦ с инфекцией", "t_при_поступлении"  = "t° при поступлении", "CGS_балл" = "CGS, балл", "Индекс_коморбидности_Чарлсона_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "Индекс_коморбидности_Чарлсона_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
+data <- data %>% rename ("Номер" = "№ истории", "Номер_референс" = "Номер Настя", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP_rs3736309" = "AQP rs3736309",  "анти-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "Дата_мозговой_катастрофы" = "Дата мозговой катастрофы" , "Основной_диагноз_код_МКБ10" = "Основной диагноз код МКБ10", "Диагноз" = "Диагноз целиком", "Дата_перевода_ФНКЦРР" = "Дата перевода в ФНКРР", "Пневмония" = "Поступил в ФНКЦ с пневмонией", "Инфекция"  = "Поступил в ФКНЦ с инфекцией", "t_при_поступлении"  = "t° при поступлении", "CGS_балл" = "CGS, балл", "Индекс_коморбидности_Чарлсона_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "Индекс_коморбидности_Чарлсона_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
 "Индекс_коморбидности_Чарлсона_21d" = "Индекс коморбидности Чарлсона (баллы) 21d",
 "Индекс_коморбидности_Чарлсона_out" = "Индекс коморбидности Чарлсона (баллы)  out",
 "CIRS-G_сумма_1d"  = "CIRS-G сумма, 1d",
@@ -116,7 +116,7 @@ hospital_renamed <- data %>% rename ("Номер" = "№ истории", "Но�
 
 
 
-noquote(colnames (hospital_renamed))
+noquote(colnames(data))
 
 
 
@@ -143,7 +143,7 @@ noquote(colnames (hospital_renamed))
 
 ```{r }
 
-hospital_days_var <- hospital_renamed %>% mutate (`До_перевода_ФКЦРР_д` = as.Date(hospital_renamed $`Дата_перевода_ФНКЦРР` , format="%d-%m-%Y")- as.Date(hospital_renamed $`Дата_мозговой_катастрофы`, format="%d-%m-%Y")) %>% mutate(`Потребность_ИВЛ` = ifelse(`Потребность_ИВЛ` =="н/д", NA, `Потребность_ИВЛ`), `Исход` = ifelse( `Исход` == 2, NA, `Исход`),
+data <- data %>% mutate (`До_перевода_ФКЦРР_д` = as.Date(hospital_renamed $`Дата_перевода_ФНКЦРР` , format="%d-%m-%Y")- as.Date(hospital_renamed $`Дата_мозговой_катастрофы`, format="%d-%m-%Y")) %>% mutate(`Потребность_ИВЛ` = ifelse(`Потребность_ИВЛ` =="н/д", NA, `Потребность_ИВЛ`), `Исход` = ifelse( `Исход` == 2, NA, `Исход`),
  `Пол` = case_when(`Пол` == 'ж' ~ 'Ж', `Пол` == 'м' ~ 'М', .default = `Пол`),
  `Пневмония` = case_when(`Пневмония` == 1 ~ "Eсть", `Пневмония` == 0 ~ "Нет", TRUE ~ NA),
  `Инфекция` = case_when(grepl("1",`Инфекция` ) ~ "Eсть", `Инфекция` == 0 ~ "Нет", TRUE ~ NA)) 
@@ -151,8 +151,8 @@ hospital_days_var <- hospital_renamed %>% mutate (`До_перевода_ФКЦ�
 #hospital_days_var <- lapply(hospital_days_var, function(x) replace(x, 'н/д', NA))
 
 	
-hospital_days_var$Инфекция 
-hospital_days_var$Исход
+data$Инфекция 
+data$Исход
   
 #date1 <- as.numeric(hospital$`Дата мозговой катастрофы`)
 #date <- c(42963,42994,42903,42933,42964)
@@ -163,12 +163,12 @@ hospital_days_var$Исход
 Полиморфизм по `HTR1A rs6295`
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`HTR1A_rs6295`) %>% filter (str_detect(`HTR1A_rs6295`, "С"))
+colnames(data)
+data %>% select(`HTR1A_rs6295`) %>% filter (str_detect(`HTR1A_rs6295`, "С"))
 
-hospital_days_var %>% select(`HTR1A_rs6295`) %>% group_by(`HTR1A_rs6295`)  %>% tally()
+data %>% select(`HTR1A_rs6295`) %>% group_by(`HTR1A_rs6295`)  %>% tally()
 
-hospital_days_var  %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С', 'C/C', `HTR1A_rs6295`))%>% group_by(`HTR1A_rs6295`)  %>% tally()
+data  %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С', 'C/C', `HTR1A_rs6295`))%>% group_by(`HTR1A_rs6295`)  %>% tally()
 
 ```
 
@@ -176,10 +176,10 @@ hospital_days_var  %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С
 
 ```{r}
 # russian letters
-hospital_days_var %>% select(`AQP4_rs1058427`) %>% filter (str_detect(`AQP4_rs1058427`, "С"))
+data %>% select(`AQP4_rs1058427`) %>% filter (str_detect(`AQP4_rs1058427`, "С"))
 
-hospital_days_var %>% select(`AQP4_rs1058427`) %>% group_by(`AQP4_rs1058427`)  %>% tally()
-hospital_days_var  %>% mutate (`AQP4_rs1058427` = ifelse (`AQP4_rs1058427` == 'C/A'| `AQP4_rs1058427` == 'С/A', 'C/A', `AQP4_rs1058427`))%>% group_by(`AQP4_rs1058427`)  %>% tally()
+data %>% select(`AQP4_rs1058427`) %>% group_by(`AQP4_rs1058427`)  %>% tally()
+data  %>% mutate (`AQP4_rs1058427` = ifelse (`AQP4_rs1058427` == 'C/A'| `AQP4_rs1058427` == 'С/A', 'C/A', `AQP4_rs1058427`))%>% group_by(`AQP4_rs1058427`)  %>% tally()
 
 
 ```
@@ -187,59 +187,59 @@ hospital_days_var  %>% mutate (`AQP4_rs1058427` = ifelse (`AQP4_rs1058427` == 'C
 Полиморфизм по `BDNF rs6265` (не требуется)
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`BDNF_rs6265`) %>% filter (str_detect(`BDNF_rs6265`, "А"))
+colnames(data)
+data %>% select(`BDNF_rs6265`) %>% filter (str_detect(`BDNF_rs6265`, "А"))
 
-hospital_days_var %>% select(`BDNF_rs6265`) %>% group_by(`BDNF_rs6265`)  %>% tally()
+data %>% select(`BDNF_rs6265`) %>% group_by(`BDNF_rs6265`)  %>% tally()
 
 ```
 
 Полиморфизм по `OLR1 rs11053646`
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`OLR1_rs11053646`) %>% filter (str_detect(`OLR1_rs11053646`, "С"))
+colnames(data)
+data %>% select(`OLR1_rs11053646`) %>% filter (str_detect(`OLR1_rs11053646`, "С"))
 
-hospital_days_var %>% select(`OLR1_rs11053646`) %>% group_by(`OLR1_rs11053646`) %>% tally()
-hospital_days_var  %>% mutate (`OLR1_rs11053646` = ifelse (`OLR1_rs11053646` == 'C/G', 'C/G', `OLR1_rs11053646`))%>% group_by(`OLR1_rs11053646`)  %>% tally()
+data %>% select(`OLR1_rs11053646`) %>% group_by(`OLR1_rs11053646`) %>% tally()
+data  %>% mutate (`OLR1_rs11053646` = ifelse (`OLR1_rs11053646` == 'C/G', 'C/G', `OLR1_rs11053646`))%>% group_by(`OLR1_rs11053646`)  %>% tally()
 ```
 
 Полиморфизм по `NRF2 rs6726395` (не требуется)
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`NRF2_rs6726395`) %>% filter (str_detect(`NRF2_rs6726395`, "А"))
+colnames(data)
+data %>% select(`NRF2_rs6726395`) %>% filter (str_detect(`NRF2_rs6726395`, "А"))
 
-hospital_days_var %>% select(`NRF2_rs6726395`) %>% group_by(`NRF2_rs6726395`) %>% tally()
+data %>% select(`NRF2_rs6726395`) %>% group_by(`NRF2_rs6726395`) %>% tally()
 ```
 
 Полиморфизм по `AGTR1 rs275651` (не требуется)
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`AGTR1_rs275651`) %>% filter (str_detect(`AGTR1_rs275651`, "А"))
+colnames(data)
+data %>% select(`AGTR1_rs275651`) %>% filter (str_detect(`AGTR1_rs275651`, "А"))
 
-hospital_days_var %>% select(`AGTR1_rs275651`) %>% group_by(`AGTR1_rs275651`) %>% tally()
+data %>% select(`AGTR1_rs275651`) %>% group_by(`AGTR1_rs275651`) %>% tally()
 ```
 
 Полиморфизм по `AQP5 rs3759129`
 
 ```{r}
-colnames(hospital_days_var)
-hospital_days_var %>% select(`AQP5_rs3759129`) %>% filter (str_detect(`AQP5_rs3759129`, "С"))
+colnames(data)
+data %>% select(`AQP5_rs3759129`) %>% filter (str_detect(`AQP5_rs3759129`, "С"))
 
-hospital_days_var %>% select(`AQP5_rs3759129`) %>% group_by(`AQP5_rs3759129`) %>% tally()
-hospital_days_var  %>% mutate (`AQP5_rs3759129` = ifelse (`AQP5_rs3759129` == 'С/C', 'C/C',`AQP5_rs3759129`)) %>% group_by(`AQP5_rs3759129`) %>% tally()
+data %>% select(`AQP5_rs3759129`) %>% group_by(`AQP5_rs3759129`) %>% tally()
+data  %>% mutate (`AQP5_rs3759129` = ifelse (`AQP5_rs3759129` == 'С/C', 'C/C',`AQP5_rs3759129`)) %>% group_by(`AQP5_rs3759129`) %>% tally()
 ```
 
 `TLR9 rs352162`
 
 ```{r}
 
-hospital_days_var %>% select(`TLR9_rs352162`) %>% filter (str_detect(`TLR9_rs352162`, "С/C"))
+data %>% select(`TLR9_rs352162`) %>% filter (str_detect(`TLR9_rs352162`, "С/C"))
 
-hospital_days_var %>% select(`TLR9_rs352162`) %>% group_by(`TLR9_rs352162`) %>% tally()
-hospital_days_var  %>% mutate (`TLR9_rs352162` = case_when(`TLR9_rs352162` == 'С/С' | `TLR9_rs352162` == 'С/C' ~ 'C/C',
+data %>% select(`TLR9_rs352162`) %>% group_by(`TLR9_rs352162`) %>% tally()
+data  %>% mutate (`TLR9_rs352162` = case_when(`TLR9_rs352162` == 'С/С' | `TLR9_rs352162` == 'С/C' ~ 'C/C',
                                                            
                                                         `TLR9_rs352162` == 'С/T' ~ 'C/T',
                                                         .default = `TLR9_rs352162` )) %>% group_by(`TLR9_rs352162`) %>% tally()
@@ -250,11 +250,11 @@ hospital_days_var  %>% mutate (`TLR9_rs352162` = case_when(`TLR9_rs352162` == '�
 
 ```{r}
 
-hospital_days_var %>% select(`TLR9_rs187084`) %>% group_by(`TLR9_rs187084`) %>% tally()
+data %>% select(`TLR9_rs187084`) %>% group_by(`TLR9_rs187084`) %>% tally()
 
-hospital_days_var %>% select(`TLR9_rs187084`) %>% filter (str_detect(`TLR9_rs187084`, "С/T"))  %>% tally()
+data %>% select(`TLR9_rs187084`) %>% filter (str_detect(`TLR9_rs187084`, "С/T"))  %>% tally()
 
-hospital_days_var  %>% mutate (`TLR9_rs187084` = case_when(`TLR9_rs187084` == 'C/T' | `TLR9_rs187084` == 'С/T' ~ 'C/T',
+data  %>% mutate (`TLR9_rs187084` = case_when(`TLR9_rs187084` == 'C/T' | `TLR9_rs187084` == 'С/T' ~ 'C/T',
                                                         .default = `TLR9_rs187084` )) %>% group_by(`TLR9_rs187084`) %>% tally()
 
 ?case_when
@@ -263,11 +263,11 @@ hospital_days_var  %>% mutate (`TLR9_rs187084` = case_when(`TLR9_rs187084` == 'C
 "AQP rs3736309" (не требуется)
 
 ```{r}
-hospital_days_var %>% select(`AQP_rs3736309`) %>% group_by(`AQP_rs3736309`) %>% tally()
+data %>% select(`AQP_rs3736309`) %>% group_by(`AQP_rs3736309`) %>% tally()
 
-hospital_days_var %>% select(`AQP_rs3736309`) %>% filter (str_detect(`AQP_rs3736309`, "A"))  %>% tally()
+data %>% select(`AQP_rs3736309`) %>% filter (str_detect(`AQP_rs3736309`, "A"))  %>% tally()
 
-hospital_days_var  %>% mutate (`AQP_rs3736309` = case_when(`AQP_rs3736309` == 'C/T' | `AQP_rs3736309` == 'С/T' ~ 'C/T',
+data  %>% mutate (`AQP_rs3736309` = case_when(`AQP_rs3736309` == 'C/T' | `AQP_rs3736309` == 'С/T' ~ 'C/T',
                                                         .default = `AQP_rs3736309` )) %>% group_by(`AQP_rs3736309`) %>% tally()
 ```
 
@@ -277,7 +277,7 @@ hospital_days_var  %>% mutate (`AQP_rs3736309` = case_when(`AQP_rs3736309` == 'C
 
 ```{r}
 
-hospital_polymorf <- hospital_days_var %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С', 'C/C', `HTR1A_rs6295`),
+hospital_polymorf <- data %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С', 'C/C', `HTR1A_rs6295`),
                               `AQP4_rs1058427` = ifelse (`AQP4_rs1058427` == 'C/A'| `AQP4_rs1058427` == 'С/A', 'C/A', `AQP4_rs1058427`),
                               `OLR1_rs11053646` = ifelse (`OLR1_rs11053646` == 'C/G', 'G/C', `OLR1_rs11053646`),
                               `AQP5_rs3759129` = ifelse (`AQP5_rs3759129` == 'С/C', 'C/C',`AQP5_rs3759129`),
@@ -396,7 +396,7 @@ plot(ans)
 ### Устин
 
 ```{r}
-data <- hospital_days_var %>% mutate(
+data <- data %>% mutate(
   `Основной_диагноз_код_МКБ10` = case_when(
     `Основной_диагноз_код_МКБ10` == "I 69.1" ~ "I69.1",
     `Основной_диагноз_код_МКБ10` == "I 69.3" ~ "I69.3",
@@ -501,12 +501,6 @@ data %>%
 ```
 
 ```{r}
-data <- data %>% 
-  mutate(`Дата_выписки_ФНКЦРР` = dmy(`Дата_выписки_ФНКЦРР`),
-         `Дата_мозговой_катастрофы` = dmy(`Дата_мозговой_катастрофы`),
-         `Дата_выписки_ФНКЦРР` = dmy(`Дата_выписки_ФНКЦРР`)
-  )
-
 data_no_na_dates <- data %>% filter(!is.na(`Дата_выписки_ФНКЦРР`)) %>% filter(!is.na(`Дата_выписки_ФНКЦРР`))
 
 forcrmp <- data_no_na_dates %>%
@@ -524,7 +518,7 @@ forcrmp <- data_no_na_dates %>%
 
 ## Competing risk regression
 ```{r}
-crr_mod <- crr(Surv(time, status) ~ `Уросептическая инфекция в любой момент времени`, forcrmp)
+crr_mod <- crr(Surv(time, status) ~ `Уросептическая_инфекция`, forcrmp)
 crr_mod
 ```
 
