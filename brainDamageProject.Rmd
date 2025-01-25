@@ -14,6 +14,7 @@ library (readxl)
 library(lubridate)
 library(tidycmprsk)
 library(ggsurvfit)
+library(anytime)
 library(SNPassoc)
 ```
 
@@ -29,11 +30,15 @@ library(SNPassoc)
 hospital <- read_csv2("data.csv")
 dates <- hospital$`Дата перевода в ФНКРР`[c(303:357)] # даты в неподходящем формате для конвертации
 
-# замена опечатки [191] "09.11..2018 0:00" 
-hospital$`Дата перевода в ФНКРР`[191] <- "09-11-2018"
+hospital$`Дата перевода в ФНКРР`[191] <- "09.11.2018"
+hospital$`Дата мозговой катастрофы`[8] <- "01.01.2014"
+hospital$`Дата мозговой катастрофы`[169] <- "12.09.2017"
+hospital$`Дата мозговой катастрофы`[321] <- "01.01.2014"
 
-hospital_data <- hospital %>% mutate(`Дата мозговой катастрофы` = as.Date(as.Date("1899-12-30") + as.numeric(`Дата мозговой катастрофы`), "%d-%m-%Y"), "%d-%m-%Y"),
-                     `Дата перевода в ФНКРР` = format(as.Date(as.Date("1899-12-30") + as.numeric(`Дата перевода в ФНКРР`), "%d-%m-%Y"), "%d-%m-%Y"))
+hospital_data <- hospital %>% mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`),
+                     `Дата перевода в ФНКРР` = dmy(substr(`Дата перевода в ФНКРР`, start=1, stop=8)),
+                     `Дата выписки из ФНКЦ РР` = dmy(`Дата выписки из ФНКЦ РР`)
+                     )
 
 ```
 ```{r}
