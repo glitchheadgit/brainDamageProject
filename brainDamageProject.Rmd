@@ -337,9 +337,10 @@ hospital_polymorf <- data %>% mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` ==
                               `TLR9_rs187084` = case_when(`TLR9_rs187084` == 'C/T' | `TLR9_rs187084` == 'С/T' ~ 'C/T',
                                                         .default = `TLR9_rs187084` ),
                               `AQP_rs3736309` = case_when(`AQP_rs3736309` == 'C/T' | `AQP_rs3736309` == 'С/T' ~ 'C/T',
-                                                        .default = `AQP_rs3736309` ))  %>% select(ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP_rs3736309, `Потребность_ИВЛ`, `Исход`)  
+                                                        .default = `AQP_rs3736309` ))  %>% 
+  select(ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP_rs3736309, `Потребность_ИВЛ`, `Исход`) %>% 
+  mutate (across(everything(), factor))  
 
-colnames(hospital_polymorf )
 
 ```
 
@@ -437,6 +438,17 @@ ans <- WGassociation(`Исход`, data=polymorph.s)
 ans
 plot(ans)
 ```
+### Лена Переменная NLR 
+
+**Neutrophil to lymphocyte ratio (NLR).** \
+NLR reflects online dynamic relationship between innate (neutrophils) and adaptive cellular immune response (lymphocytes) during illness and various pathological states. NLR is influenced by many conditions including age, rice, medication, chronic disease like coronary heart disease, stroke, diabetes, obesity, psychiatric diagnosis, cancer of solid organs, anemia and stress. A normal range of NLR is between 1-2, the values higher than 3.0 and below 0.7 in adults are pathological. NLR in a grey zone between 2.3-3.0 may serve as early warning of pathological state or process such like cancer, atherosclerosis, infection, inflammation, psychiatric disorders and stress. 
+
+```{r}
+NLR_data <- data %>% select (ID, `NEU_#_1d`,`LYM_#_1d`) %>%
+                     mutate ( across (!ID, as.numeric), `NLR_1d` = `NEU_#_1d` / `LYM_#_1d` ) %>% 
+                     select (ID,`NLR_1d`)
+```
+
 
 
 ### Устин
@@ -952,3 +964,75 @@ lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
 
 print(lrt_result_combo)
 ```
+
+```{r}
+
+```
+
+###Регрессионный анализ для поиска ассоциации:
+
+Проверить гипотезы о взаимодействии (для всей выборки и в стратах)
+○ Полиморфизм гена TLR9 (рецептор) и внеклеточной ДНК 
+○ Полиморфизм гена AQP4 и лейкоцитарного индекса NLR
+
+##### Cвязь полиморфизма гена TLR9 (рецептор) и внеклеточной ДНК 
+
+In nuclear and mitochondrial DNA, 8-hydroxy-2' -deoxyguanosine (8-OHdG) or 8-oxo-7,8-dihydro-2' -deoxyguanosine (8-oxodG) is one of the predominant forms of free radical-induced oxidative lesions, and has therefore been widely used as a biomarker for oxidative stress and carcinogenesis. Studies showed that urinary 8-OHdG is a good biomarker for risk assessment of various cancers and degenerative diseases. 
+
+```{r}
+
+disease_group_id <- data %>% select (ID, Возраст, SOFA_1d,  diseaseGroup, oneday_log, `8ohdg 1d log`, CGS_балл,`Индекс_коморбидности_Чарлсона_1d`, `Койко-дни_ФНКЦРР`)
+hospital_polymorf_group <- left_join(hospital_polymorf, disease_group_id, by = "ID" )
+
+ 
+
+#  `ИСХОД` БЕЗ ГРУППИРОВКИ
+fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hospital_polymorf_group, family = binomial)
+summary(fit_tlr)
+# Полиморфизм/ ДНК нет значимой ассоциации предикторов с исходом (выписка, смерть)
+
+#  `ИСХОД` C ГРУППИРОВКОЙ
+fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+summary(fit_tlr_gr)
+# Полиморфизм/ ДНК не ассоциированы...Последствие ЧМТ ухудшает прогноз (ур знач 0,05)
+
+#  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
+fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+summary(fit_tlr_1)
+# Полиморфизм/ ДНК не ассоциированы...Гипоксия ассоциирована с увеличением вероятности потребности в ИВЛ (ур знач 0,05)
+
+#  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
+fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hospital_polymorf_group)
+summary(fit_tlr_2)
+# Полиморфизм/ ДНК не ассоциированы... Группа Последствие ЧМТ - положительная ассоциация с кол-вом койко-дней и отрицательная для Группы Новообразования
+
+
+```
+
+##### Cвязь полиморфизма гена AQP4 (рецептор) и уровня показателя NLR
+
+```{r}
+hospital_polymorf_group_nlr <- left_join(hospital_polymorf_group, NLR_data, by = "ID")
+```
+
+```{r}
+#  `ИСХОД` БЕЗ ГРУППИРОВКИ
+#  !!!!!! огромные std errors ??????
+
+#  `ИСХОД` C ГРУППИРОВКОЙ
+fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+summary(fit_nlr_gr)
+# NLR_1 ассоциирован с исходом (эффект незначителен?), страта не ассоциирована
+
+#  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
+fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+summary(fit_nlr_gr1)
+## NLR_1 ассоциирован с исходом (эффект незначителен?), новообразование?
+
+#  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
+fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hospital_polymorf_group_nlr)
+summary(fit_nlr_2)
+# Полиморфизм/ NLR не ассоциированы... Последствия ЧМТ?
+```
+
+
