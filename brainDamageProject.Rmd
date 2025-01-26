@@ -766,6 +766,7 @@ ggplot(correlation_matrix_melted, aes(Var1, Var2, fill = value)) +
 
 data$Исход <- as.numeric(data$Исход)
 #drop_na(data)
+data <- data[data$Исход %in% c(0, 1), ]
 table(data$Исход)
 str(data$Возраст)
 data$SOFA_1d <- as.numeric(data$SOFA_1d)
@@ -794,7 +795,7 @@ lrt_result <- anova(model_reduced, model_full, test = "Chi")
 print(lrt_result)
 
 
-
+library(car)
 vif(model)
 vif_results <- vif(model)
 vif_results_df <- as.data.frame(vif_results)
@@ -892,19 +893,23 @@ list(
 )
 
 #####попробую вот эту штуку центрирование – вычитание собственной средней из всех ##интервальных предикторов; приводит к осмысленному значению константы
-data$Возраст <- scale(data$Возраст, center = TRUE, scale = FALSE)
-data$SOFA_1d <- scale(data$SOFA_1d, center = TRUE, scale = FALSE)
-data$Индекс_коморбидности_Чарлсона_1d <- scale(data$Индекс_коморбидности_Чарлсона_1d, center = TRUE, scale = FALSE)
-data$CGS_балл <- scale(data$CGS_балл, center = TRUE, scale = FALSE)
-data$oneday_log <- scale(data$oneday_log, center = TRUE, scale = FALSE)
-data$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = FALSE)
+data_center <- data
+
+data_center$Возраст <- scale(data$Возраст, center = TRUE, scale = FALSE)
+data_center$SOFA_1d <- scale(data$SOFA_1d, center = TRUE, scale = FALSE)
+data_center$Индекс_коморбидности_Чарлсона_1d <- scale(data$Индекс_коморбидности_Чарлсона_1d, center = TRUE, scale = FALSE)
+data_center$CGS_балл <- scale(data$CGS_балл, center = TRUE, scale = FALSE)
+data_center$oneday_log <- scale(data$oneday_log, center = TRUE, scale = FALSE)
+data_center$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = FALSE)
+
+
 
 model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                         CGS_балл + oneday_log + `8ohdg 1d log` +
                         Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
                         Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
                         `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
-                      data = data, 
+                      data = data_center, 
                       family = binomial)
 vif_results_dagcentr <- vif(model_dagcentr)
 vif_results_df_dagcentr <- as.data.frame(vif_results_dagcentr)
@@ -929,9 +934,12 @@ list(
 )
 
 #####lets do the lrt again
+data_clean_center <- na.omit(data_center[, c("Исход", "Возраст", "SOFA_1d", 
+                               "Индекс_коморбидности_Чарлсона_1d", 
+                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
 model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                       CGS_балл + oneday_log + `8ohdg 1d log`, 
-                    data = data_clean, 
+                    data = data_clean_center, 
                     family = binomial)
 
 model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
@@ -939,7 +947,7 @@ model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_к�
                     Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
                     Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
                     `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
-                  data = data_clean, 
+                  data = data_clean_center, 
                   family = binomial)
 
 lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
