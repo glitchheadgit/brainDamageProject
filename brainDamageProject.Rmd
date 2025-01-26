@@ -42,38 +42,87 @@ data <- hospital %>% mutate(`Дата мозговой катастрофы` = d
 
 ```
 ```{r}
+########Уберем нд и нормализуем внк ДНК
 data <- data %>%
   mutate(across(everything(), ~na_if(as.character(.), "н/д")))
+
+#data <- data %>%
+  #mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`))
 target_columns <- c("внкДНК, нг/мл 1d", "8ohdg на миллион оснований 1d",
                     "внкДНК, нг/мл 5d", "8ohdg на миллион оснований 5d")
 
-# Преобразование данных в числовой формат
-data <- data %>% mutate(across(all_of(target_columns), as.numeric))
 
-data$oneday_log <-log(data$"внкДНК, нг/мл 1d")
-data$fiveday_log <-log(data$"внкДНК, нг/мл 5d")
+data <- data %>%
+  mutate(across(all_of(target_columns), as.numeric))
 
-# for one day
-data1<-data[1:173,"oneday_log"]
-data2<-data[220:522,"oneday_log"]
-mean1 = mean(data1$oneday_log, na.rm = TRUE)
-mean2 = mean(data2$oneday_log, na.rm = TRUE)
 
-coeff = mean2/mean1;
+data <- data %>%
+  mutate(
+    oneday_log = if_else(`внкДНК, нг/мл 1d` > 0, log(`внкДНК, нг/мл 1d`), NA_real_),
+    fiveday_log = if_else(`внкДНК, нг/мл 5d` > 0, log(`внкДНК, нг/мл 5d`), NA_real_)
+  )
 
-data["внкДНК, нг/мл 1d калибр"] <-data$"внкДНК, нг/мл 1d"
-data[1:173,"внкДНК, нг/мл 1d калибр"]<-data[1:173,"внкДНК, нг/мл 1d калибр"]*coeff
 
-# for five days
-data1<-data[1:173,"fiveday_log"]
-data2<-data[220:522,"fiveday_log"]
-mean1 = mean(data1$fiveday_log,na.rm = TRUE)
-mean2 = mean(data2$fiveday_log,na.rm = TRUE)
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
 
-coeff = mean2/mean1;
+mean1 <- mean(data1$oneday_log, na.rm = TRUE)
+mean2 <- mean(data2$oneday_log, na.rm = TRUE)
 
-data["внкДНК, нг/мл 5d калибр"] <-data$"внкДНК, нг/мл 5d"
-data[1:173,"внкДНК, нг/мл 5d калибр"]<-data[1:173,"внкДНК, нг/мл 5d калибр"]*coeff
+coeff1 <- mean2 / mean1
+
+data <- data %>%
+  mutate(oneday_log = if_else(row_number() <= 173, 
+                              oneday_log * coeff1, 
+                              oneday_log))
+
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
+
+mean1 <- mean(data1$fiveday_log, na.rm = TRUE)
+mean2 <- mean(data2$fiveday_log, na.rm = TRUE)
+
+coeff2 <- mean2 / mean1
+
+
+data <- data %>%
+  mutate(fiveday_log = if_else(row_number() <= 173, 
+                               fiveday_log * coeff2, 
+                               fiveday_log))
+
+
+data
+
+######я забыла про 8ohg 
+data <- data %>%
+  mutate(
+    `8ohdg 1d log` = if_else(`8ohdg на миллион оснований 1d` > 0, log(`8ohdg на миллион оснований 1d`), NA_real_),
+    `8ohdg 5d log` = if_else(`8ohdg на миллион оснований 5d` > 0, log(`8ohdg на миллион оснований 5d`), NA_real_)
+  )
+
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
+
+mean1_ohdg1 <- mean(data1$`8ohdg 1d log`, na.rm = TRUE)
+mean2_ohdg1 <- mean(data2$`8ohdg 1d log`, na.rm = TRUE)
+
+coeff_ohdg1 <- mean2_ohdg1 / mean1_ohdg1
+
+data <- data %>%
+  mutate(`8ohdg на миллион оснований 1d лог` = if_else(row_number() <= 173, 
+                                                      `8ohdg 1d log` * coeff_ohdg1, 
+                                                      `8ohdg 1d log`))
+
+mean1_ohdg5 <- mean(data1$`8ohdg 5d log`, na.rm = TRUE)
+mean2_ohdg5 <- mean(data2$`8ohdg 5d log`, na.rm = TRUE)
+
+coeff_ohdg5 <- mean2_ohdg5 / mean1_ohdg5
+
+data <- data %>%
+  mutate(`8ohdg 5d лог` = if_else(row_number() <= 173, 
+                                                      `8ohdg 5d log` * coeff_ohdg5, 
+                                                      `8ohdg 5d log`))
+
 data
 ```
 
@@ -645,4 +694,255 @@ ggplot(data) +
 
 #write.csv(data,"data250124.csv", row.names = T) 
 
+```
+Женя корреляции и логистическая регрессия
+```{r}
+library(ggplot2)
+library(reshape2)
+names(data)
+
+
+
+target_columns <- c(
+  "Индекс_коморбидности_Чарлсона_1d",
+  "CGS_балл",
+  "Возраст",
+  "FOUR_1d",
+  "SOFA_1d",
+  "WBC_1d",
+  "NEU_#_1d",
+  "LYM_#_1d",
+  "PLT_1d",
+  "Лактат_1d",
+  "Креатинин_1d",
+  "АЛТ_1d",
+  "АСТ_1d",
+  "Альбумин_1d",
+  "Щелочная_фосфотаза_1d",
+  "Мочевина_1d",
+  "Мочевая_кислота_1d",
+  "ГГТ_1d",
+  "Калий_1d",
+  "Натрий_1d",
+  "АЧТВ_1d",
+  "Хлорид_1d",
+  "МНО_1d",
+  "Фибриноген_1d",
+  "ПВ_1d",
+  "oneday_log",
+  "8ohdg 1d log",
+  "ИВЛ_д"
+  
+)
+
+
+data_filtered <- data %>% select(all_of(target_columns))
+
+names(data_filtered)
+data_subset_numeric <- data_filtered %>%
+  mutate(across(everything(), ~as.numeric(as.character(.)))) %>%
+  select(where(is.numeric))  
+correlation_matrix <- cor(data_subset_numeric, use = "complete.obs")
+correlation_matrix
+
+
+correlation_matrix_melted <- melt(correlation_matrix)
+
+ggplot(correlation_matrix_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),  
+    axis.text.y = element_text(color = "black")  
+  ) +
+  labs(title = "Матрица корреляций", x = "Переменные", y = "Переменные") -> corr_plot
+
+#ggsave("C:/Users/enami/Downloads/correlation_matrix.png", plot = corr_plot, width = 10, #height = 8, bg = "white")
+
+#data_filtered_num <- data %>%
+# mutate(across(c("Возраст", "SOFA_1d", "Индекс_коморбидности_Чарлсона_1d", 
+#                "CGS_балл", "oneday_log", "8ohdg 1d log"), as.numeric))
+
+data$Исход <- as.numeric(data$Исход)
+#drop_na(data)
+table(data$Исход)
+str(data$Возраст)
+data$SOFA_1d <- as.numeric(data$SOFA_1d)
+data$Индекс_коморбидности_Чарлсона_1d <-as.numeric(data$Индекс_коморбидности_Чарлсона_1d)
+data$CGS_балл<-as.numeric(data$CGS_балл)
+data$oneday_log <-as.numeric(data$oneday_log)
+data$`8ohdg 1d log` <-as.numeric(data$`8ohdg 1d log`)
+data$Возраст <- as.numeric(data$Возраст)
+model <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+               CGS_балл + oneday_log + `8ohdg 1d log`, 
+             data = data, 
+             family = binomial)
+######LR ratio
+data_clean <- na.omit(data[, c("Исход", "Возраст", "SOFA_1d", 
+                               "Индекс_коморбидности_Чарлсона_1d", 
+                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
+
+model_full <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+                  CGS_балл + oneday_log + `8ohdg 1d log`, 
+                  data = data_clean, 
+                  family = binomial)
+model_reduced <- glm(Исход ~ Возраст, 
+                     data = data_clean, 
+                     family = binomial)
+lrt_result <- anova(model_reduced, model_full, test = "Chi")
+print(lrt_result)
+
+
+
+vif(model)
+vif_results <- vif(model)
+vif_results_df <- as.data.frame(vif_results)
+vif_results_df$Variables <- rownames(vif_results_df)
+
+summary(model)
+logistic_results <- as.data.frame(summary(model)$coefficients)
+logistic_results$Variables <- rownames(logistic_results)
+
+###we should add OR and CI to report results #https://www.statology.org/how-to-report-logistic-regression-results/
+logistic_results$OR <- exp(logistic_results$Estimate)
+logistic_results$CI_lower <- exp(logistic_results$Estimate - 1.96 * logistic_results$`Std. Error`)
+logistic_results$CI_upper <- exp(logistic_results$Estimate + 1.96 * logistic_results$`Std. Error`)
+
+#install.packages("performance")
+library(performance)
+model_check <-check_model(model)
+model_check
+#ggsave("C:/Users/enami/Downloads/model_diagnostics_plot.png", plot = model_check)
+#png("C:/Users/enami/Downloads/combined_model_diagnostics.png", width = 1200, height = 800)
+#plot(model_check)  # Рисуем графики
+#dev.off()
+library(dagitty)
+
+#####DAG ANALYSIS
+
+#install.packages("ggdag")
+#install.packages("dagitty")
+library(ggdag)
+library(dagitty)
+dag <- dagitty("dag {
+  Outcome <- Age
+  Outcome <- SOFA_1d
+  Outcome <- Charlson_Index_1d
+  Outcome <- CGS_Score
+  Outcome <- oneday_log
+  Outcome <- 8hdg_1d_log
+  
+  Age -> SOFA_1d
+  Age -> Charlson_Index_1d
+  Age -> CGS_Score
+  
+  oneday_log -> SOFA_1d
+  oneday_log -> Charlson_Index_1d
+  8hdg_1d_log -> SOFA_1d
+  8hdg_1d_log -> Charlson_Index_1d
+}")
+
+
+plot(dag)
+
+dag_plot <- ggdag(dag) +
+  geom_dag_node(color = "grey", size = 15, alpha = 0.7) +  
+  geom_dag_text(aes(label = name), color = "black", size = 5, fontface = "bold") +  
+  theme_dag() + 
+  theme(
+    legend.position = "none"
+  ) +
+  coord_fixed(ratio = 1.5)  
+
+#ggsave("C:/Users/enami/Downloads/dag_plot.png", plot = dag_plot, width = 10, height = 8, #bg = "white")
+
+model_dag <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+                   CGS_балл + oneday_log + `8ohdg 1d log` +
+                   Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
+                   Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
+                   `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                 data = data, 
+                 family = binomial)
+model_dag
+
+library(car)
+vif_results_dag <- vif(model_dag)
+vif_results_df_dag <- as.data.frame(vif_results_dag)
+vif_results_df_dag$Variables <- rownames(vif_results_df_dag)
+logistic_results_dag <- as.data.frame(summary(model_dag)$coefficients)
+logistic_results_dag$Variables <- rownames(logistic_results_dag)
+
+library(performance)
+model_check_dag <- check_model(model_dag)
+model_check_dag
+
+#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot.png", width = 1200, height = 800)
+#plot(model_check)  
+#dev.off()
+
+
+library(ggdag)
+
+
+list(
+  VIF = vif_results_df_dag,
+  Summary = logistic_results_dag,
+  Diagnostics = model_check_dag
+)
+
+#####попробую вот эту штуку центрирование – вычитание собственной средней из всех ##интервальных предикторов; приводит к осмысленному значению константы
+data$Возраст <- scale(data$Возраст, center = TRUE, scale = FALSE)
+data$SOFA_1d <- scale(data$SOFA_1d, center = TRUE, scale = FALSE)
+data$Индекс_коморбидности_Чарлсона_1d <- scale(data$Индекс_коморбидности_Чарлсона_1d, center = TRUE, scale = FALSE)
+data$CGS_балл <- scale(data$CGS_балл, center = TRUE, scale = FALSE)
+data$oneday_log <- scale(data$oneday_log, center = TRUE, scale = FALSE)
+data$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = FALSE)
+
+model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+                        CGS_балл + oneday_log + `8ohdg 1d log` +
+                        Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
+                        Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
+                        `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                      data = data, 
+                      family = binomial)
+vif_results_dagcentr <- vif(model_dagcentr)
+vif_results_df_dagcentr <- as.data.frame(vif_results_dagcentr)
+vif_results_df_dagcentr$Variables <- rownames(vif_results_df_dagcentr)
+vif_results_dagcentr #####круто центрирование сработало
+logistic_results_dagcentr <- as.data.frame(summary(model_dagcentr)$coefficients)
+logistic_results_dagcentr$Variables <- rownames(logistic_results_dagcentr)
+logistic_results_dagcentr$OR <- exp(logistic_results_dagcentr$Estimate)
+logistic_results_dagcentr$CI_lower <- exp(logistic_results_dagcentr$Estimate - 1.96 * logistic_results_dagcentr$`Std. Error`)
+logistic_results_dagcentr$CI_upper <- exp(logistic_results_dagcentr$Estimate + 1.96 * logistic_results_dagcentr$`Std. Error`)
+
+model_check_dagcentr <- check_model(model_dagcentr)
+model_check_dagcentr
+
+#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot_scale.png", width = 1200, height #= 800)
+#plot(model_check_dagcentr)  
+#dev.off()
+list(
+  VIF = vif_results_df_dagcentr,
+  Summary = logistic_results_dagcentr,
+  Diagnostica = model_check_dagcentr
+)
+
+#####lets do the lrt again
+model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+                      CGS_балл + oneday_log + `8ohdg 1d log`, 
+                    data = data_clean, 
+                    family = binomial)
+
+model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
+                    CGS_балл + oneday_log + `8ohdg 1d log` +
+                    Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
+                    Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
+                    `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                  data = data_clean, 
+                  family = binomial)
+
+lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
+
+print(lrt_result_combo)
 ```
