@@ -974,10 +974,12 @@ print(lrt_result_combo)
 ```{r}
 # подготовить такой датасет лучше где -то выше (все переменные + включить группировку, обработанные полиморфизмы и NLR)
 
-data_for_regres <- data %>% select (ID, Пол, Возраст, `анти-HCV`, `Hbs_AG`,  `ЛСМА`, Пневмония, Инфекция, diseaseGroup, CGS_балл, Индекс_коморбидности_Чарлсона_1d,`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`, `CIRS-G_индекс_тяжести_1d`, FOUR_1d, SOFA_1d, внкДНК_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`,  `PLT_1d`, `Лактат_1d`, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, `Сепсис/септический_шок`, `Потребность_ИВЛ`, `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`, `Исход`, `Пневмония_возникшая_ФНКЦРР`, `oneday_log`, `8ohdg 1d log` ) %>% mutate(across(c(`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`,`CIRS-G_индекс_тяжести_1d`,`FOUR_1d`, `WBC_1d`, `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`, `PLT_1d`, `Лактат_1d`, `Креатинин_1d` , `АЛТ_1d`, `АСТ_1d`, `Альбумин_1d`, `Щелочная_фосфотаза_1d`, `Мочевая_кислота_1d`, `Мочевина_1d` , `ГГТ_1d`, `Калий_1d`, `Натрий_1d`, `Хлорид_1d`, `АЧТВ_1d`, `МНО_1d`,`Фибриноген_1d`, ПВ_1d , `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`), as.numeric), across(Исход, factor)) 
+data_for_regres <- data %>% select (ID, Пол, Возраст, `анти-HCV`, `Hbs_AG`,  `ЛСМА`, Пневмония, Инфекция, diseaseGroup, CGS_балл, Индекс_коморбидности_Чарлсона_1d,`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`, `CIRS-G_индекс_тяжести_1d`, FOUR_1d, SOFA_1d, внкДНК_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`,  `PLT_1d`, `Лактат_1d`, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, `Сепсис/септический_шок`, `Потребность_ИВЛ`, `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`, `Исход`, `Пневмония_возникшая_ФНКЦРР`, `oneday_log`, `8ohdg 1d log` ) %>% mutate(across(c(`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`,`CIRS-G_индекс_тяжести_1d`,`FOUR_1d`, `WBC_1d`, `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`, `PLT_1d`, `Лактат_1d`, `Креатинин_1d` , `АЛТ_1d`, `АСТ_1d`, `Альбумин_1d`, `Щелочная_фосфотаза_1d`, `Мочевая_кислота_1d`, `Мочевина_1d` , `ГГТ_1d`, `Калий_1d`, `Натрий_1d`, `Хлорид_1d`, `АЧТВ_1d`, `МНО_1d`,`Фибриноген_1d`, ПВ_1d , `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`), as.numeric), across(c(Исход,`Потребность_ИВЛ`), factor)) 
 
 
-hosp_poly_group <- left_join(data_for_regres, hospital_polymorf[,1:11], by = "ID" ) hosp_poly_group_nlr <- left_join(hosp_poly_group, NLR_data, by = "ID" )
+hosp_poly_group <- left_join(data_for_regres, hospital_polymorf[,1:11], by = "ID" )
+
+hosp_poly_group_nlr <- left_join(hosp_poly_group, NLR_data, by = "ID" ) %>% select (-ID)
 
 #Получили полный датасет, включая новые переменные и отредактированные исходные c правильным типом
 summary(hosp_poly_group_nlr)
@@ -1012,7 +1014,7 @@ tmp2 = bind_rows(lapply(out, function(frml) {
 }))
 tmp2
 
-signif_estim_univar<- as_data_frame(tmp1) %>% filter (`p.value` <= 0.05)
+signif_estim_univar <- as_data_frame(tmp1) %>% filter (`p.value` <= 0.05)
 write.xlsx(signif_estim_univar, 'signif_estim_univar_glm.xlsx')
 
 #signif_results_univar<- as_data_frame(tmp2)
@@ -1031,27 +1033,26 @@ In nuclear and mitochondrial DNA, 8-hydroxy-2' -deoxyguanosine (8-OHdG) or 8-oxo
 ```{r}
 
 disease_group_id <- data %>% select (ID, Возраст, SOFA_1d,  diseaseGroup, oneday_log, `8ohdg 1d log`, CGS_балл,`Индекс_коморбидности_Чарлсона_1d`, `Койко-дни_ФНКЦРР`)
-hospital_polymorf_group <- left_join(hospital_polymorf, disease_group_id, by = "ID" )
 
- 
+
 
 #  `ИСХОД` БЕЗ ГРУППИРОВКИ
-fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hospital_polymorf_group, family = binomial)
+fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr)
 # Полиморфизм/ ДНК нет значимой ассоциации предикторов с исходом (выписка, смерть)
 
 #  `ИСХОД` C ГРУППИРОВКОЙ
-fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_gr)
 # Полиморфизм/ ДНК не ассоциированы...Последствие ЧМТ ухудшает прогноз (ур знач 0,05)
 
 #  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_1)
 # Полиморфизм/ ДНК не ассоциированы...Гипоксия ассоциирована с увеличением вероятности потребности в ИВЛ (ур знач 0,05)
 
 #  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hospital_polymorf_group)
+fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_tlr_2)
 # Полиморфизм/ ДНК не ассоциированы... Группа Последствие ЧМТ - положительная ассоциация с кол-вом койко-дней и отрицательная для Группы Новообразования
 
@@ -1061,7 +1062,7 @@ summary(fit_tlr_2)
 ##### Cвязь полиморфизма гена AQP4 (рецептор) и уровня показателя NLR
 
 ```{r}
-hospital_polymorf_group_nlr <- left_join(hospital_polymorf_group, NLR_data, by = "ID")
+
 ```
 
 ```{r}
@@ -1069,17 +1070,17 @@ hospital_polymorf_group_nlr <- left_join(hospital_polymorf_group, NLR_data, by =
 #  !!!!!! огромные std errors ??????
 
 #  `ИСХОД` C ГРУППИРОВКОЙ
-fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr)
 # NLR_1 ассоциирован с исходом (эффект незначителен?), страта не ассоциирована
 
 #  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr1)
 ## NLR_1 ассоциирован с исходом (эффект незначителен?), новообразование?
 
 #  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hospital_polymorf_group_nlr)
+fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_nlr_2)
 # Полиморфизм/ NLR не ассоциированы... Последствия ЧМТ?
 ```
