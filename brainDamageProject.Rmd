@@ -124,6 +124,11 @@ data <- data %>%
                                                       `8ohdg 5d log`))
 
 data
+
+data[data == "н/Д" | 
+    data == "нд" | 
+  data == "Н/Д"] <- NA
+
 ```
 
 ```{r}
@@ -789,6 +794,7 @@ model <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморби
                CGS_балл + oneday_log + `8ohdg 1d log`, 
              data = data, 
              family = binomial)
+summary(model)
 ######LR ratio
 data_clean <- na.omit(data[, c("Исход", "Возраст", "SOFA_1d", 
                                "Индекс_коморбидности_Чарлсона_1d", 
@@ -847,11 +853,9 @@ dag <- dagitty("dag {
   Age -> SOFA_1d
   Age -> Charlson_Index_1d
   Age -> CGS_Score
+  Charlson_Index_1d -> CGS_Score
+  Charlson_Index_1d -> SOFA_1d
   
-  oneday_log -> SOFA_1d
-  oneday_log -> Charlson_Index_1d
-  8hdg_1d_log -> SOFA_1d
-  8hdg_1d_log -> Charlson_Index_1d
 }")
 
 
@@ -871,8 +875,7 @@ dag_plot <- ggdag(dag) +
 model_dag <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                    CGS_балл + oneday_log + `8ohdg 1d log` +
                    Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                   Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                   `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                   Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
                  data = data, 
                  family = binomial)
 model_dag
@@ -917,8 +920,7 @@ data_center$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = 
 model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                         CGS_балл + oneday_log + `8ohdg 1d log` +
                         Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                        Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                        `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                        Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
                       data = data_center, 
                       family = binomial)
 vif_results_dagcentr <- vif(model_dagcentr)
@@ -955,14 +957,57 @@ model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_
 model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                     CGS_балл + oneday_log + `8ohdg 1d log` +
                     Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                    Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                    `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                    Индекс_коморбидности_Чарлсона_1d:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Возраст:CGS_балл,
                   data = data_clean_center, 
                   family = binomial)
 
 lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
 
 print(lrt_result_combo)
+
+######stepwise regression and knn stuff
+library(tidymodels)
+library(recipes)
+library(MASS)
+data_for_regres2 <- data[, c( "Пол", "Возраст",   "Пневмония", 
+                             "Инфекция",  "CGS_балл", "Индекс_коморбидности_Чарлсона_1d", 
+                             "CIRS-G_сумма_1d", "CIRS-G_систем_с_паталогиями_5d_36", 
+                             "CIRS-G_индекс_тяжести_1d", "FOUR_1d", "SOFA_1d", 
+                             "WBC_1d", "NEU_#_1d",  "LYM_#_1d", 
+                              "PLT_1d", "Лактат_1d", "Креатинин_1d", "АЛТ_1d", 
+                             "АСТ_1d", "Альбумин_1d", "Щелочная_фосфотаза_1d", "Мочевая_кислота_1d", 
+                             "Мочевина_1d", "ГГТ_1d", "Калий_1d", "Натрий_1d", "Хлорид_1d", 
+                             "АЧТВ_1d", "МНО_1d", "Фибриноген_1d", "ПВ_1d", "Уросептическая_инфекция", 
+                             "Сепсис/септический_шок", "Потребность_ИВЛ",  
+                             "ИВЛ_д",  "Койко-дни_ФНКЦРР", "Исход", 
+                             "Пневмония_возникшая_ФНКЦРР", "oneday_log", "8ohdg 1d log")]
+
+data_for_regres2 <- data_for_regres2 %>%
+  mutate(
+    Пол = ifelse(Пол == "м", 1, 2),  # м -> 1, ж -> 2
+    Пневмония = ifelse(Пневмония == "есть", 1, 2),  
+    Инфекция = ifelse(Инфекция == "есть", 1, 2)
+  )
+data_for_regres2[] <- lapply(data_for_regres2, function(x) {
+  if (!is.numeric(x)) as.numeric(as.character(x)) else x
+})
+rec <- recipe(Исход ~ ., data = data_for_regres2) %>%
+  step_impute_knn(all_predictors(), neighbors = 5)
+
+rec_prep <- prep(rec)
+data_imputed <- bake(rec_prep, new_data = NULL)
+sum(is.na(data_for_regres2))  
+sum(is.na(data_imputed))      
+model_glm <- glm(Исход ~ ., data = data_imputed, family = binomial)
+stepwise_model_glm <- stepAIC(model_glm, direction = "both", trace = TRUE)
+summary(stepwise_model_glm)
+summary(stepwise_model_glm)
+
+
+summary(stepwise_model_glm)
+vif(stepwise_model_glm)
+
+
 ```
 
 ```{r}
