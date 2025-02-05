@@ -1,0 +1,683 @@
+---
+title: "brain_dam_work"
+output: html_document
+date: "2025-02-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library (tidyverse)
+library (readxl)
+library(lubridate)
+library(tidycmprsk)
+library(ggsurvfit)
+library(anytime)
+library(SNPassoc)
+library(aod)
+```
+
+
+```{r cars}
+data <- read_csv2("data.csv")
+
+data$`Дата перевода в ФНКРР`[191] <- "09.11.2018"
+data$`Дата мозговой катастрофы`[8] <- "01.01.2014"
+data$`Дата мозговой катастрофы`[169] <- "12.09.2017"
+data$`Дата мозговой катастрофы`[321] <- "01.01.2014"
+
+data <- data %>% mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`),
+                     `Дата перевода в ФНКРР` = dmy(substr(`Дата перевода в ФНКРР`, start=1, stop=8)),
+                     `Дата выписки из ФНКЦ РР` = dmy(`Дата выписки из ФНКЦ РР`)
+                     )
+
+```
+
+
+```{r}
+########Уберем нд и нормализуем внк ДНК
+data <- data %>%
+  mutate(across(everything(), ~na_if(as.character(.), "н/д")))
+
+#data <- data %>%
+  #mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`))
+target_columns <- c("внкДНК, нг/мл 1d", "8ohdg на миллион оснований 1d",
+                    "внкДНК, нг/мл 5d", "8ohdg на миллион оснований 5d")
+
+
+data <- data %>%
+  mutate(across(all_of(target_columns), as.numeric))
+
+
+data <- data %>%
+  mutate(
+    oneday_log = if_else(`внкДНК, нг/мл 1d` > 0, log(`внкДНК, нг/мл 1d`), NA_real_),
+    fiveday_log = if_else(`внкДНК, нг/мл 5d` > 0, log(`внкДНК, нг/мл 5d`), NA_real_)
+  )
+
+
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
+
+mean1 <- mean(data1$oneday_log, na.rm = TRUE)
+mean2 <- mean(data2$oneday_log, na.rm = TRUE)
+
+coeff1 <- mean2 / mean1
+
+data <- data %>%
+  mutate(oneday_log = if_else(row_number() <= 173, 
+                              oneday_log * coeff1, 
+                              oneday_log))
+
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
+
+mean1 <- mean(data1$fiveday_log, na.rm = TRUE)
+mean2 <- mean(data2$fiveday_log, na.rm = TRUE)
+
+coeff2 <- mean2 / mean1
+
+
+data <- data %>%
+  mutate(fiveday_log = if_else(row_number() <= 173, 
+                               fiveday_log * coeff2, 
+                               fiveday_log))
+
+
+data
+
+######я забыла про 8ohg 
+data <- data %>%
+  mutate(
+    `8ohdg 1d log` = if_else(`8ohdg на миллион оснований 1d` > 0, log(`8ohdg на миллион оснований 1d`), NA_real_),
+    `8ohdg 5d log` = if_else(`8ohdg на миллион оснований 5d` > 0, log(`8ohdg на миллион оснований 5d`), NA_real_)
+  )
+
+data1 <- data %>% slice(1:173)
+data2 <- data %>% slice(220:522)
+
+mean1_ohdg1 <- mean(data1$`8ohdg 1d log`, na.rm = TRUE)
+mean2_ohdg1 <- mean(data2$`8ohdg 1d log`, na.rm = TRUE)
+
+coeff_ohdg1 <- mean2_ohdg1 / mean1_ohdg1
+
+data <- data %>%
+  mutate(`8ohdg на миллион оснований 1d лог` = if_else(row_number() <= 173, 
+                                                      `8ohdg 1d log` * coeff_ohdg1, 
+                                                      `8ohdg 1d log`))
+
+mean1_ohdg5 <- mean(data1$`8ohdg 5d log`, na.rm = TRUE)
+mean2_ohdg5 <- mean(data2$`8ohdg 5d log`, na.rm = TRUE)
+
+coeff_ohdg5 <- mean2_ohdg5 / mean1_ohdg5
+
+data <- data %>%
+  mutate(`8ohdg 5d лог` = if_else(row_number() <= 173, 
+                                                      `8ohdg 5d log` * coeff_ohdg5, 
+                                                      `8ohdg 5d log`))
+
+data
+data_e <- data
+```
+
+### ENGLISH RENAME
+
+```{r}
+data_e <- data_e %>% rename ("Num" = "№ истории", "Part" = "Часть", "Sex" = "Пол", "Num_ref" = "Номер Настя", "Age" = "Возраст", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP5_rs3736309" = "AQP rs3736309",  "anti-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "LMCA" = "ЛСМА", "Date_brain_damage" = "Дата мозговой катастрофы" , "Main_diagnosis_code" = "Основной диагноз код МКБ10", "Diagnosis" = "Диагноз целиком", "Transfer_date_FSCCRR" = "Дата перевода в ФНКРР", "Pneumonia" = "Поступил в ФНКЦ с пневмонией", "Infection"  = "Поступил в ФКНЦ с инфекцией", "T_admission"  = "t° при поступлении", "CGS" = "CGS, балл", "CCI_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "CCI_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
+"CCI_21d" = "Индекс коморбидности Чарлсона (баллы) 21d",
+"CCI_out" = "Индекс коморбидности Чарлсона (баллы)  out",
+"CIRS-G_sum_1d"  = "CIRS-G сумма, 1d",
+"CIRS-G_pathology_1d" = "CIRS-G систем с паталогиями, 1d" ,
+"CIRS-G_severity_1d" = "CIRS-G индекс тяжести, 1d",
+"CIRS-G_sum_5d_35"  = "CIRS-G сумма, 5d...35",
+"CIRS-G_pathology_5d_36"= "CIRS-G систем с паталогиями, 5d...36",
+"CIRS-G_severity_5d_37" = "CIRS-G индекс тяжести, 5d...37",
+"CIRS-G_sum_5d_38" = "CIRS-G сумма, 5d...38",
+"CIRS-G_pathology__5d_39"  = "CIRS-G систем с паталогиями, 5d...39",
+"CIRS-G_severity_5d_40" = "CIRS-G индекс тяжести, 5d...40",
+"CIRS-G_sum_out" = "CIRS-G сумма, out",
+"CIRS-G_pathology_out" = "CIRS-G систем с паталогиями, out",
+"CIRS-G_severity_out" = "CIRS-G индекс тяжести, out",
+"exDNA_1d" = "внкДНК, нг/мл 1d",
+"8ohdg_1d" = "8ohdg на миллион оснований 1d",
+"exDNA_5d" = "внкДНК, нг/мл 5d",
+"8ohdg_5d" = "8ohdg на миллион оснований 5d",
+"Uroseptic_infection" = "Уросептическая инфекция в любой момент времени",
+"Sepsis/septic_shock" = "Сепсис/септический шок в любой момент времни",
+"Ventilation_demand" = "Потребность в ИВЛ за время госпитализации в любой момент времени",
+"Ухудшение пневмонии_сутки" = "Ухудшение исходной пневмонии, сутки",
+"Ventilation_d" = "ИВЛ (дни)",
+"Discharge_date_FSCCRR" = "Дата выписки из ФНКЦ РР",
+"ICU_FSCCRR_d" = "Дней в ОРИТ ФНКЦ РР",
+"FSCCRR_bed-days" = "Койко-дней в ФНКЦ РР",
+"Outcome" = "Исход, 0 -выписан, 1 умер, 2 - цензура",
+"Pneumonia_at_FSCCRR" = "Пневмония возникшая в ФНКЦ РР",
+ "Pneuminia_deterioration_d" = "Ухудшение исходной пневмонии, сутки") %>% 
+  rename_with(~ gsub("Лактат","Lactate", .x)) %>% 
+  rename_with(~ gsub("Креатинин","Creatinine", .x)) %>% 
+  rename_with(~ gsub("АЛТ","ALT", .x)) %>% 
+  rename_with(~ gsub("АСТ","AST", .x)) %>% 
+  rename_with(~ gsub("Альбумин","Albumin", .x)) %>% 
+  rename_with(~ gsub("Щелочная фосфотаза","Alcaline_phosphatase", .x)) %>% 
+  rename_with(~ gsub("Мочевая кислота","Uric_acid", .x)) %>% 
+  rename_with(~ gsub("Мочевина","Urea", .x)) %>% 
+  rename_with(~ gsub("ГГТ","GGT", .x)) %>% 
+  rename_with(~ gsub("Натрий","Sodium", .x)) %>% 
+  rename_with(~ gsub("Калий","Potassium", .x)) %>% 
+  rename_with(~ gsub("Хлорид","Chloride", .x)) %>% 
+  rename_with(~ gsub("АЧТВ","APTT", .x)) %>% 
+  rename_with(~ gsub("МНО","INR", .x)) %>% 
+  rename_with(~ gsub("Фибриноген","Fibrinogen", .x)) %>% 
+  rename_with(~ gsub("ПВ","PT", .x)) %>% 
+  rename_at(vars(44 : 148), ~str_replace_all(., "\\s+", "_"))  %>% 
+  mutate(across(`Age`, as.integer))
+
+colnames(data_e)
+
+```
+
+  Список основных переменных: 
+  Номер, ID,  Пол, HTR1A_rs6295, AQP4_rs1058427 , BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162                     TLR9_rs187084, AQP_rs3736309, Возраст, анти-HCV, Hbs_AG,  ЛСМА, Основной_диагноз_код_МКБ10, Диагноз, Пневмония, Инфекция, CGS_балл, Индекс_коморбидности_Чарлсона_1d, CIRS-G_сумма_1d, CIRS-G_систем_с_паталогиями_1, CIRS-G_индекс_тяжести_1d, FOUR_1d, SOFA_1d, внкДНК_1d, 8ohdg_1d, WBC_1d,  NEU_#_1d, NEU_%_1d, LYM_#_1d, LYM_%_1d,  PLT_1d, Лактат_1d, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, Сепсис/септический_шок, Потребность_ИВЛ, Ухудшение_пневмонии_сутки, ИВЛ_д, Дни_ОРИТ_ФНКЦРР, Койко-дни_ФНКЦРР, Исход, Пневмония_возникшая_ФНКЦРР  
+  
+
+
+Расчитаем срок до перевода в ФНКЦРР (`До_перевода_ФКЦРР_д`) и проведем вычистку переменных исхода (н/д заменим на NA, исход 2 на NA), переменных ПОЛ
+
+```{r }
+
+data_e <- data_e %>% mutate (`Before_FSCCRR_d` = as.Date(data_e$`Transfer_date_FSCCRR` , format="%d-%m-%Y")- as.Date(data_e$`Date_brain_damage`, format="%d-%m-%Y"))%>% 
+  mutate(`Ventilation_demand` = ifelse(`Ventilation_demand` =="н/д", NA, `Ventilation_demand`), `Outcome` = ifelse( `Outcome` == 2, NA, `Outcome`),
+ `Sex` = case_when(`Sex` %in% c('ж', 'Ж') ~ 'F', `Sex`  %in% c('м', 'М') ~ 'M', .default = `Sex`),
+ `Pneumonia` = case_when(`Pneumonia` == 1 ~ "Yes", `Pneumonia` == 0 ~ "No", TRUE ~ NA),
+ `Infection` = case_when(grepl("1",`Infection` ) ~ "Yes", `Infection` == 0 ~ "No", TRUE ~ NA),
+ `Sepsis/septic_shock` = case_when(grepl("1",`Sepsis/septic_shock` ) ~ "Yes", `Sepsis/septic_shock` == 0 ~ "No", TRUE ~ NA))
+
+data_e$`Outcome`
+#date1 <- as.numeric(hospital$`Дата мозговой катастрофы`)
+#date <- c(42963,42994,42903,42933,42964)
+#as.Date(as.(date), origin = "1899-12-30")
+#format(as.Date(as.Date("1899-12-30") + as.numeric(`Дата мозговой катастрофы`), "%d-%m-%Y"), "%d-%m-%Y")
+
+```
+
+Analyse SCCRR- days 
+
+```{r}
+
+BD <- as.numeric(data_e$`FSCCRR_bed-days`)
+res<-quantile(BD, probs = c(0,0.25,0.5,0.75,1), na.rm = T)
+res
+
+
+```
+
+
+### SNP
+
+SNP Preparation : "HTR1A_rs6295" "AQP4_rs1058427" "BDNF_rs6265"
+"OLR1_rs11053646" "NRF2_rs6726395" "AGTR1_rs275651" "AQP5_rs3759129"
+"TLR9_rs352162" "TLR9_rs187084" "AQP5_rs3736309"
+
+```{r}
+
+hospital_polymorf_e <- data_e %>% mutate (`NLR_1d` = as.numeric(`NEU_#_1d`) / as.numeric(`LYM_#_1d`) ) %>%  mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs6295` == 'С/С', 'C/C', `HTR1A_rs6295`),
+                              `AQP4_rs1058427` = ifelse (`AQP4_rs1058427` == 'C/A'| `AQP4_rs1058427` == 'С/A', 'C/A', `AQP4_rs1058427`),
+                              `OLR1_rs11053646` = ifelse (`OLR1_rs11053646` == 'C/G', 'G/C', `OLR1_rs11053646`),
+                              `AQP5_rs3759129` = ifelse (`AQP5_rs3759129` == 'С/C', 'C/C',`AQP5_rs3759129`),
+                              `TLR9_rs352162` = case_when(`TLR9_rs352162` == 'С/С' | `TLR9_rs352162` == 'С/C' ~ 'C/C',
+                                                           
+                                                        `TLR9_rs352162` == 'С/T' ~ 'C/T',
+                                                        .default = `TLR9_rs352162` ),
+                              `TLR9_rs187084` = case_when(`TLR9_rs187084` == 'C/T' | `TLR9_rs187084` == 'С/T' ~ 'C/T',
+                                                        .default = `TLR9_rs187084` ),
+                              `AQP5_rs3736309` = case_when(`AQP5_rs3736309` == 'C/T' | `AQP5_rs3736309` == 'С/T' ~ 'C/T',
+                                                        .default = `AQP5_rs3736309` ))  %>% 
+  select(ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309, `Ventilation_demand`, `Outcome`, `oneday_log`, `8ohdg 1d log`, `NLR_1d` ) %>% 
+  mutate (across(c(HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309), factor)) 
+
+```
+
+График распространенности SNP
+
+```{r}
+hospital_polymorf_long <- hospital_polymorf_e %>%
+  select (ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309) %>%
+  pivot_longer(!ID, names_to = "Position", values_to = "SNP")
+
+ggplot (hospital_polymorf_long) +
+  geom_bar (aes(SNP)) +
+  facet_wrap (~Position, nrow = 4, axes = "all", axis.labels = "all_x")
+```
+**SNP descriptive analysis**
+
+```{r}
+library(SNPassoc)
+# specify columns contain SNP
+polymorf.s <- setupSNP (data=hospital_polymorf_e, colSNPs=2:11, sep="/")
+# got new class snp
+
+head(polymorf.s$TLR9_rs352162)
+summary(polymorf.s$TLR9_rs352162)
+# which shows the genotype and allele frequencies for a given SNP, testing for Hardy-Weinberg equilibrium (HWE).
+```
+`
+
+```{r}
+ #We can  visualize the results in a plot by
+plot(polymorf.s$TLR9_rs352162)
+plot(polymorf.s$TLR9_rs352162, type=pie)
+```
+
+Genotyping of SNPs needs to pass quality control measures. Aside from technical details that need to be considered for filtering SNPs with low quality, genotype calling error can be detected by a HWE test. The test compares the observed genotype frequencies with those expected under random mating, which follows when the SNPs are in the absence of selection, mutation, genetic drift, or other forces. Therefore, HWE must be checked only in controls. There are several tests described in the literature to verify HWE. In SNPassoc HWE is tested for all the bi-allelic SNP markers using a fast exact test Wigginton, Cutler, and Abecasis (2005) implemented in the tableHWE function.
+
+```{r}
+# results across all snp
+summary(polymorf.s, print=FALSE)
+```
+
+Showing the SNP labels with minor/major allele format, the major allele
+frequency the HWE test and the percentage of missing genotypes. Missing
+values can be further explored plotting with:
+
+```{r}
+plotMissing(polymorf.s, print.labels.SNPs = FALSE)
+```
+Missing genotypes. Black squares shows missing genotype information of dataset.
+This plot can be used to inspect if missing values appear randomly across individuals and SNPs. In our case, we can see that the missing pattern may be considered not random. Group of individuals should be further checked for possible problems with genotyping.
+MNCR? 
+
+**Hardy-Weinberg equilibrium**
+
+Genotyping of SNPs needs to pass quality control measures. Aside from technical details that need to be considered for filtering SNPs with low quality. The test compares the observed genotype frequencies with those expected under random mating, which follows when the SNPs are in the absence of selection, mutation, genetic drift, or other forces. Therefore, HWE must be checked only in controls. There are several tests described in the literature to verify HWE. In SNPassoc HWE is tested for all the bi-allelic SNP markers using a fast exact test Wigginton, Cutler, and Abecasis (2005) implemented in the tableHWE function.
+
+Set Ventillation demand as a Outcome for further HWE analysis.
+
+```{r}
+hwe <- tableHWE(polymorf.s)
+hwe
+```
+We observe that TLR9_rs352162 SNPs in the dataset is not under HWE since their P-values rejecting the HWE hypothesis (null hypothesis) are less than 0.05. However, when tested in control samples only (appreciated attitude), by stratifying by cases and controls:
+
+Check  HWE in control `Outcome` ("0" - discharge)
+```{r}
+hwe2 <- tableHWE(polymorf.s, `Outcome`)
+
+#SNPs is HWE in the whole sample but not controls!!
+snpNHWE <- hwe2[,1]>0.05 & hwe2[,2]<0.05
+rownames(hwe2)[snpNHWE]
+```
+In case  TLR9_rs187084, reject null hypotesis HWE (p-value for control group  < 0.05). Otherwise one is interested in keeping those SNPs that **do not reject the null hypothesis**. 
+
+NOTE: As several SNPs are tested, multiple comparisons must be considered. In this particular setting, a threshold of 0.001 is normally considered. As a quality control measure, it is not necessary to be as conservative as in those situations where false discovery rates need to be controlled.
+
+HWE analysys considered TLR9_rs352162 and TLR9_rs187084 are not under HWE and should be excluded, but alternative casecontrol stratification (by Ventilation_demand) showed that all SNP are under HWE in control group:
+
+```{r}
+hwe3 <- tableHWE(polymorf.s, `Ventilation_demand`)
+
+#SNPs is HWE in the whole sample but not controls
+snpNHWE <- hwe3[,1]>0.05 & hwe3[,2]<0.05
+rownames(hwe3)[snpNHWE]
+```
+
+The decision was to assign all SNP to furter analysis.
+
+
+```{r}
+#SNPs that do not pass the HWE test must be removed form further analyses. We can recall setupSNP and indicate the columns of the SNPs to be kept
+
+#snps.ok <- rownames(hwe2)[hwe2[,2]>=0.001]
+#pos <- which(colnames(hospital_polymorf)%in%snps.ok, useNames = FALSE)
+#polymorph.s <- setupSNP(hospital_polymorf, pos, sep="/")
+```
+
+
+**SNP association analysis**
+**Outcome analysis**
+
+We are interested in finding those SNPs associated with outcome status. The association analysis for all genetic models is performed by the function association that regresses Outcome on the variable SNP from the dataset that already contains the SNP variables of class snp.
+
+```{r}
+association(`Outcome` ~ TLR9_rs352162, data= polymorf.s)
+```
+The P-values obtained from massive univariate analyses are visualized with the generic plot function
+
+```{r}
+ans <- WGassociation(`Outcome`, data=polymorf.s)
+ans
+plot(ans)
+```
+Manhattan-type plots for different genetic models. P-values in -log10 scale to assess the association between case-control status and SNPs in the asthma example.
+This produces a Manhattan plot of the -log10(P-values) for all the SNPs over all models. It shows the nominal level of significance and the Bonferroni level, which is the level corrected by the multiple testing across all SNPs. The overall hypothesis of massive univariate association tests is whether there is any SNP that is significantly associated with the phenotype. As multiple SNPs are tested, the probability of finding at least one significant finding increases if we do not lower the significance threshold. The Bonferroni correction lowers the threshold by the number of SNPs tested (0.0001=0.05/51). In the Manhattan plot of our analysis, we see that no SNP is significant at the Bonferroni level, and therefore there is no SNP that is significantly associated with Outcome.
+
+```{r}
+association(`NLR_1d` ~ `AQP4_rs1058427` , data= polymorf.s)
+```
+
+```{r}
+ans_nlr <- WGassociation(`NLR_1d`, data=polymorf.s)
+ans_nlr
+plot(ans_nlr)
+```
+```{r}
+ans_dna <- WGassociation(`oneday_log`, data=polymorf.s)
+ans_dna
+plot(ans_dna)
+```
+
+
+**Neutrophil to lymphocyte ratio (NLR).** 
+
+NLR reflects online dynamic relationship between innate (neutrophils) and adaptive cellular immune response (lymphocytes) during illness and various pathological states. NLR is influenced by many conditions including age, rice, medication, chronic disease like coronary heart disease, stroke, diabetes, obesity, psychiatric diagnosis, cancer of solid organs, anemia and stress. A normal range of NLR is between 1-2, the values higher than 3.0 and below 0.7 in adults are pathological. NLR in a grey zone between 2.3-3.0 may serve as early warning of pathological state or process such like cancer, atherosclerosis, infection, inflammation, psychiatric disorders and stress. 
+
+```{r}
+NLR_data <- data_e %>% select (ID, `NEU_#_1d`,`LYM_#_1d`) %>%
+                     mutate ( across (!ID, as.numeric), `NLR_1d` = `NEU_#_1d` / `LYM_#_1d` ) %>% 
+                     select (ID,`NLR_1d`)
+
+#ADD DESIASE GROUP
+dis_group <- read_excel("~/Downloads/data_group.xlsx") %>% select (ID, diseaseGroup)
+
+data_full <- left_join(data_e, NLR_data, by = "ID" )
+data_full <- left_join(data_full, dis_group , by = "ID") %>% mutate (diseaseGroup = case_when(  diseaseGroup == "Последствие ЧМТ" ~ "TBI",
+                                                                                             diseaseGroup == "Геморрагический инсульт" ~ "Hemorrhagic stroke",
+                                                                                             diseaseGroup == "Ишемический инсульт" ~ "Ischemic stroke",
+                                                                                             diseaseGroup == "Новообразование" ~ "Tumor",
+                                                                                             diseaseGroup == "Гипоксия" ~ "Hypoxia" ))
+
+data_full$diseaseGroup
+```
+
+### Л унивариантный регрессия для всех переменных:
+
+Dataset for regression preparation, including 0-day status, demographic data, disease group and NLR:
+
+```{r}
+
+data_for_regres <- data_full %>% select (ID, Sex, Age, `anti-HCV`, `Hbs_AG`,  `LMCA`, Pneumonia, Infection, diseaseGroup, CGS, CCI_1d,`CIRS-G_sum_1d`, `CIRS-G_pathology_1d`, `CIRS-G_severity_1d`, FOUR_1d, SOFA_1d, exDNA_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `LYM_#_1d`,`PLT_1d`, `Lactate_1d`, Creatinine_1d, ALT_1d, AST_1d,  Albumin_1d, Alcaline_phosphatase_1d , Uric_acid_1d, Urea_1d, GGT_1d, Potassium_1d, Sodium_1d, Chloride_1d,  APTT_1d, INR_1d, Fibrinogen_1d, PT_1d, `Uroseptic_infection`, `Sepsis/septic_shock`, `Ventilation_demand`, `Pneuminia_deterioration_d`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`, `Outcome`, `Pneumonia_at_FSCCRR`, `oneday_log`, `8ohdg 1d log`) %>% 
+  
+  mutate(across(c(CGS, CCI_1d ,`CIRS-G_sum_1d`, `CIRS-G_pathology_1d`,`CIRS-G_severity_1d`,`FOUR_1d`, `SOFA_1d`, `WBC_1d`, `NEU_#_1d`, `LYM_#_1d`, `PLT_1d`, `Lactate_1d`, `Creatinine_1d` , `ALT_1d`, `AST_1d`, `Albumin_1d`, `Alcaline_phosphatase_1d`, `Uric_acid_1d`, `Urea_1d` , `GGT_1d`, `Potassium_1d`, `Sodium_1d`, `Chloride_1d`, `APTT_1d`, `INR_1d`,`Fibrinogen_1d`, PT_1d , `Pneuminia_deterioration_d`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`), as.numeric), 
+         across(c(Outcome,`Ventilation_demand`), factor)) %>%
+  # new variable - categorised `FSCCRR_bed-days` by quantiles
+  mutate (BD_group = case_when (`FSCCRR_bed-days` < 30 ~ "0-30",
+                                30 <= `FSCCRR_bed-days` & `FSCCRR_bed-days` < 46 ~ "30-46",
+                                46 <= `FSCCRR_bed-days` & `FSCCRR_bed-days` < 67 ~ "46-67",
+                                67 < `FSCCRR_bed-days` ~ "67-401"))
+  
+
+
+hosp_poly_group <- left_join(data_for_regres, hospital_polymorf_e[,1:11], by = "ID" )
+
+hosp_poly_group_nlr <- left_join(hosp_poly_group, NLR_data, by = "ID" ) %>% select (-ID)
+
+#Achieve corrected  dataset with right names and correct variables types
+summary(hosp_poly_group_nlr)
+str(hosp_poly_group_nlr)
+colnames(hosp_poly_group_nlr)
+
+data_for_regres %>% group_by(`BD_group`)  %>% tally ()
+
+```
+### Univariate statistics across all variables (at point 0 )
+ Run regression for all variables of interest
+
+
+```{r}
+x <- names(hosp_poly_group_nlr[,-45])
+formulas <- unlist(lapply(45, function(n) combn(x, 1, FUN=function(row) paste0("Outcome ~ ", paste0("`",row, "`",collapse = "+")))))
+formulas  # combine each variable into formula ("outcome ~ variable of interest")
+```
+
+```{r warning=FALSE}
+models <- formulas %>%       # add all formulas
+  
+  # iterate through each univariate formula
+  map(                               
+    .f = ~glm(                       # pass the formulas one-by-one to glm()
+      formula = as.formula(.x),      # within glm(), the string formula is .x
+      family = "binomial",           # specify type of glm (logistic)
+      data = hosp_poly_group_nlr)) %>%          # dataset
+  
+  # tidy up each of the glm regression outputs from above
+  map(
+    .f = ~tidy(
+      .x, 
+      exponentiate = TRUE,           # exponentiate 
+      conf.int = TRUE)) %>%          # return confidence intervals
+  
+  # collapse the list of regression outputs in to one data frame
+  bind_rows() %>% 
+  # round all numeric columns
+  mutate(across(where(is.numeric), round, digits = 2)) 
+```
+
+### Alternative code for looped uvivariate regression (estimates without exponentiating)
+
+```{r warning=FALSE}
+library(broom)
+library(openxlsx)
+
+x = names(hosp_poly_group_nlr[,-45])
+out <- unlist(lapply(45, function(n) combn(x, 1, FUN=function(row) paste0("Outcome ~ ", paste0("`",row, "`",collapse = "+")))))
+out
+
+#regression coefficients
+tmp1 <- bind_rows(lapply(out, function(frml) {
+ a <- tidy(glm(frml, data= hosp_poly_group_nlr, family = binomial), exponentiate = TRUE, conf.int = TRUE) %>%
+   mutate(across(where(is.numeric), round, digits = 2))
+ a$frml = frml
+ return(a)
+}))
+
+tmp1 <- tmp1 %>% mutate (`sign_.05` = ifelse (`p.value` >= 0.05, "no", "yes" ))
+
+signif_estim_univar <- as_data_frame(tmp1) %>% filter (`p.value` <= 0.05)
+write.xlsx(signif_estim_univar, 'signif_estim_univar_glm.xlsx')
+#regression results R2, AIC, BIC
+#tmp2 = bind_rows(lapply(out, function(frml) {
+# a = glance(lm(frml, data=hosp_poly_group_nlr))
+# a$frml = frml
+# return(a)
+# }))
+# tmp2
+#signif_results_univar<- as_data_frame(tmp2)
+#write.xlsx(signif_estim_univar, 'signif_results_univar_glm.xlsx')
+```
+```{r}
+library (gtsummary)
+univ_tab <- hosp_poly_group_nlr  %>% 
+  dplyr::select(all_of(x), Outcome) %>% ## select variables of interest
+
+  tbl_uvregression(                         ## produce univariate table
+    method = glm,                           ## define regression want to run (generalised linear model)
+    y = Outcome,                            ## define outcome variable
+    method.args = list(family = binomial),  ## define what type of glm want to run (logistic)
+    exponentiate = TRUE                     ## exponentiate to produce odds ratios (rather than log odds)
+  ) %>% 
+bold_p()
+
+## view univariate results table 
+univ_tab
+```
+
+Graphical representation of univariant regression (color designate statistical significance)
+
+
+```{r}
+
+tmp1 %>% 
+  
+  #set order of levels to appear along y-axis
+  mutate(`sign_.05` = fct_relevel(
+    `sign_.05`, "yes", "no")) %>%
+  
+  # remove "intercept" row from plot
+  filter(term != "(Intercept)") %>% 
+  
+   # remove "UNSIGNIFICANT" TERMS from plot
+  filter (`sign_.05`!= "no") %>% 
+  
+  ## plot with variable on the y axis and estimate (OR) on the x axis
+  ggplot(aes(x = estimate, y = term)) +
+  
+  ## show the estimate as a point
+  geom_point(aes(color = `sign_.05`)) + 
+  
+  ## add in an error bar for the confidence intervals
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high), width = 0.5) + 
+  
+  ## show where OR = 1 is for reference as a dashed line
+  geom_vline(xintercept = 1, linetype = "dotted") +
+  scale_x_continuous(limits = c(-1, 47))   # cut off extreme CI range
+```
+
+
+
+```{r}
+#explanatory_vars <-
+
+#mv_reg <- explanatory_vars %>%  ## begin with vector of explanatory column names
+ # str_c(collapse = "+") %>%     ## combine all names of the variables of interest separated by a plus
+#  str_c("Outcone ~ ", .) %>%    ## combine the names of variables of interest with outcome in formula style
+#  glm(family = "binomial",      ## define type of glm as logistic,
+#      data = linelist) 
+```
+
+### PRINCIPAL COMPONENT ANALYSIS
+
+Get NUMERIC variables for day 0, demographic data, diagnosis group, and calculated NLR, DNA
+
+```{r}
+library(factoextra)
+library(FactoMineR)
+library(ggbiplot) 
+
+#str(hosp_poly_group_nlr) 
+
+#check how many NA among chosen variables 
+
+na_count <-sapply(hosp_poly_group_nlr, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+
+#delete variables with more than 60 NA's (more than 11%)
+
+full_nums <- hosp_poly_group_nlr %>% select (!c(LMCA, `8ohdg_1d`,`Lactate_1d`,
+                                                `Alcaline_phosphatase_1d`, `Uric_acid_1d`, `GGT_1d`, 
+                                                `Chloride_1d`, `Pneuminia_deterioration_d`, `8ohdg 1d log`,`FSCCRR_bed-days`)) %>% 
+                                    select (BD_group, Outcome, Ventilation_demand,diseaseGroup, where(is.numeric)) %>% drop_na()
+
+# got a tibble:367 × 29
+
+hospital.full.pca <- prcomp(full_nums[,-(1:4)], 
+                scale = T) # scaling
+summary(hospital.full.pca)
+
+contr_1a <- fviz_contrib(hospital.full.pca, choice = "var", axes = 1) 
+contr_2a <- fviz_contrib(hospital.full.pca, choice = "var", axes = 2) # axes - номер комоненты, из чего состоит каждая компонента?
+contr_1a
+contr_2a
+
+fviz_eig (hospital.full.pca, addlabels = T, ylim = c (0,50))
+pca_graph <- fviz_pca_var(hospital.full.pca, col.var = "contrib")
+pca_graph
+```
+Biplot for Outcome ( 0 = death, 1 = discharge)
+
+```{r}
+
+biplot <- ggbiplot(hospital.full.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = full_nums$Outcome) +
+         labs(title = "PCA of yield contributing parameters")
+biplot
+```
+Biplot for Ventilation_demand ( 0 = NO, 1 = YES)
+
+```{r}
+biplot0 <- ggbiplot(hospital.full.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = full_nums$Ventilation_demand) +
+         labs(title = "PCA of yield contributing parameters")
+biplot0
+```
+
+Biplot for BED-DAYS at center ( "0-30", "30-46", "46-67", "67-401"  )
+
+```{r}
+biplot_BD <- ggbiplot(hospital.full.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = full_nums$`BD_group`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_BD
+```
+
+
+Get less predictors, additionally exclude lab test results (except NLR) and components of CIRS-G composit score
+
+```{r}
+# Get less predictors, additionally exclude lab test results (except NLR) and components of CIRS-G composit score
+
+unlist(colnames (full_nums))
+
+small_pca <- hosp_poly_group_nlr %>% select (Outcome, Ventilation_demand, BD_group, diseaseGroup, Age, CGS, CCI_1d,  `CIRS-G_sum_1d`, 
+                                            `FOUR_1d`, `Ventilation_d`, `NLR_1d`, `ICU_FSCCRR_d`) %>% drop_na()
+
+
+hospital.pca <- prcomp(small_pca[,-(1:4)], 
+                scale = T) # шкалирование нужно так как датафрейм подаем не шкалированный
+summary(hospital.pca)
+# birth.pca$rotation
+
+# графическая визуализация доли объясненной изменчивости для каждой из компонент
+fviz_eig (hospital.pca, addlabels = T, ylim = c (0,50))
+
+contrib_1 <- fviz_contrib(hospital.pca, choice = "var", axes = 1) 
+contrib_2 <- fviz_contrib(hospital.pca, choice = "var", axes = 2) # axes - номер комоненты, из чего состоит каждая компонента?
+contrib_1
+contrib_2
+pca_sm_graph <- fviz_pca_var(hospital.pca, col.var = "contrib")
+pca_sm_graph
+
+
+```
+Biplot for Outcome ( 0 = death, 1 = discharge)
+
+```{r}
+library(ggbiplot)
+biplot1 <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$Outcome) +
+         labs(title = "PCA of yield contributing parameters")
+biplot1
+```
+Biplot for Ventilation_demand ( 0 = NO, 1 = YES)
+
+```{r}
+biplot2 <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$Ventilation_demand) +
+         labs(title = "PCA of yield contributing parameters")
+biplot2
+```
+
+Biplot for BED-DAYS at center ( "0-30", "30-46", "46-67", "67-401"  )
+
+```{r}
+biplot_BD_sm <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$`BD_group`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_BD_sm
+```
+
+Biplot for desiase_group
+
+```{r}
+biplot_des_sm <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$`diseaseGroup`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_des_sm
+```
+
+
+
+
+
+
+
+
+
+
