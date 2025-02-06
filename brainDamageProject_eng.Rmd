@@ -134,7 +134,7 @@ data_e <- data
 #### ENGLISH RENAME
 
 ```{r}
-data_e <- data %>% rename ("Num" = "№ истории", "Part" = "Часть", "Sex" = "Пол", "Num_ref" = "Номер Настя", "Age" = "Возраст", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP5_rs3736309" = "AQP rs3736309",  "anti-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "LMCA" = "ЛСМА", "Date_brain_damage" = "Дата мозговой катастрофы" , "Main_diagnosis_code" = "Основной диагноз код МКБ10", "Diagnosis" = "Диагноз целиком", "Transfer_date_FSCCRR" = "Дата перевода в ФНКРР", "Pneumonia" = "Поступил в ФНКЦ с пневмонией", "Infection"  = "Поступил в ФКНЦ с инфекцией", "T_admission"  = "t° при поступлении", "CGS" = "CGS, балл", "CCI_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "CCI_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
+data_e <- data_e %>% rename ("Num" = "№ истории", "Part" = "Часть", "Sex" = "Пол", "Num_ref" = "Номер Настя", "Age" = "Возраст", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP5_rs3736309" = "AQP rs3736309",  "anti-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "LMCA" = "ЛСМА", "Date_brain_damage" = "Дата мозговой катастрофы" , "Main_diagnosis_code" = "Основной диагноз код МКБ10", "Diagnosis" = "Диагноз целиком", "Transfer_date_FSCCRR" = "Дата перевода в ФНКРР", "Pneumonia" = "Поступил в ФНКЦ с пневмонией", "Infection"  = "Поступил в ФКНЦ с инфекцией", "T_admission"  = "t° при поступлении", "CGS" = "CGS, балл", "CCI_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "CCI_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
 "CCI_21d" = "Индекс коморбидности Чарлсона (баллы) 21d",
 "CCI_out" = "Индекс коморбидности Чарлсона (баллы)  out",
 "CIRS-G_sum_1d"  = "CIRS-G сумма, 1d",
@@ -181,9 +181,10 @@ data_e <- data %>% rename ("Num" = "№ истории", "Part" = "Часть", 
   rename_with(~ gsub("Фибриноген","Fibrinogen", .x)) %>% 
   rename_with(~ gsub("ПВ","PT", .x)) %>% 
   rename_at(vars(44 : 148), ~str_replace_all(., "\\s+", "_"))  %>% 
-  mutate(across(`Age`, as.integer)) %>% 
+  mutate(across(`Age`, as.integer)) 
   # delete initial dna- variables  
-  select (!c(`8ohdg на миллион оснований 1d лог`, `8ohdg 5d лог`))
+  
+data_e <- data_e[ ,-c(52, 54, 163, 164)]
 
 colnames(data_e)
 ```
@@ -200,8 +201,12 @@ data_e <- data_e %>% mutate (`Before_FSCCRR_d` = as.Date(data_e$`Transfer_date_F
  `Sex` = case_when(`Sex` %in% c('ж', 'Ж') ~ 'F', `Sex`  %in% c('м', 'М') ~ 'M', .default = `Sex`),
  `Pneumonia` = case_when(`Pneumonia` == 1 ~ "Yes", `Pneumonia` == 0 ~ "No", TRUE ~ NA),
  `Infection` = case_when(grepl("1",`Infection` ) ~ "Yes", `Infection` == 0 ~ "No", TRUE ~ NA),
- `Sepsis/septic_shock` = case_when(grepl("1",`Sepsis/septic_shock` ) ~ "Yes", `Sepsis/septic_shock` == 0 ~ "No", TRUE ~ NA)) %>% 
+ `Sepsis/septic_shock` = case_when(grepl("1",`Sepsis/septic_shock` ) ~ "Yes", `Sepsis/septic_shock` == 0 ~ "No", TRUE ~ NA),
+ `Pneumonia_at_FSCCRR` = case_when(grepl("1",`Pneumonia_at_FSCCRR` ) ~ "Yes", `Pneumonia_at_FSCCRR` == 0 ~ "No", TRUE ~ NA),
+ `Hbs_AG`= case_when(`Hbs_AG` == 1 ~ "Yes", `Hbs_AG` == 0 ~ "No", TRUE ~ NA)) %>% 
   mutate (`NLR_1d` = as.numeric(`NEU_#_1d`) / as.numeric(`LYM_#_1d`))
+
+
 
 ```
 
@@ -629,9 +634,9 @@ ggplot(data_e) +
 ```
 
 
-### Univariate regression for all variables (at time point 0)
+### Dataset for analysis preparation
 
-Prepate ataset for regression preparation, including 0-day status, demographic data, disease group and NLR. Also create a new categorial variable for bed-days at FSCCRR based on quantiles , called **BD_group**
+Prepare dataset for for PCA analysis and univariate regression, including 0-day status, demographic data, disease group and NLR. Also create a new categorial variable for bed-days at FSCCRR based on quantiles , called **BD_group**
 
 ```{r}
 
@@ -641,7 +646,7 @@ BD <- as.numeric(data_e$`FSCCRR_bed-days`)
 res<-quantile(BD, probs = c(0,0.25,0.5,0.75,1), na.rm = T)
 res
 
-data_for_regres <- data_e %>% select (ID, Sex, Age, `anti-HCV`, `Hbs_AG`,  `LMCA`, Pneumonia, Infection, diseaseGroup, CGS, CCI_1d,`CIRS-G_sum_1d`, `CIRS-G_pathology_1d`, `CIRS-G_severity_1d`, FOUR_1d, SOFA_1d, exDNA_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `LYM_#_1d`,`PLT_1d`, `Lactate_1d`, Creatinine_1d, ALT_1d, AST_1d,  Albumin_1d, Alcaline_phosphatase_1d , Uric_acid_1d, Urea_1d, GGT_1d, Potassium_1d, Sodium_1d, Chloride_1d,  APTT_1d, INR_1d, Fibrinogen_1d, PT_1d, `Uroseptic_infection`, `Sepsis/septic_shock`, `Ventilation`, `Pneumonia_deterioration_d`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`, `Outcome`, `Pneumonia_at_FSCCRR`, `oneday_log`, `8ohdg 1d log`) %>% 
+data_for_regres <- data_e %>% select (ID, Sex, Age, `anti-HCV`, `Hbs_AG`,  `LMCA`, Pneumonia, Infection, diseaseGroup, CGS, CCI_1d,`CIRS-G_sum_1d`, `CIRS-G_pathology_1d`, `CIRS-G_severity_1d`, FOUR_1d, SOFA_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `LYM_#_1d`,`PLT_1d`, `Lactate_1d`, Creatinine_1d, ALT_1d, AST_1d,  Albumin_1d, Alcaline_phosphatase_1d , Uric_acid_1d, Urea_1d, GGT_1d, Potassium_1d, Sodium_1d, Chloride_1d,  APTT_1d, INR_1d, Fibrinogen_1d, PT_1d, `Uroseptic_infection`, `Sepsis/septic_shock`, `Ventilation`, `Pneumonia_deterioration_d`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`, `Outcome`, `Pneumonia_at_FSCCRR`, `oneday_log`, `8ohdg 1d log`, `NLR_1d`) %>% 
   
   mutate(across(c(CGS, CCI_1d ,`CIRS-G_sum_1d`, `CIRS-G_pathology_1d`,`CIRS-G_severity_1d`,`FOUR_1d`, `SOFA_1d`, `WBC_1d`, `NEU_#_1d`, `LYM_#_1d`, `PLT_1d`, `Lactate_1d`, `Creatinine_1d` , `ALT_1d`, `AST_1d`, `Albumin_1d`, `Alcaline_phosphatase_1d`, `Uric_acid_1d`, `Urea_1d` , `GGT_1d`, `Potassium_1d`, `Sodium_1d`, `Chloride_1d`, `APTT_1d`, `INR_1d`,`Fibrinogen_1d`, PT_1d , `Pneumonia_deterioration_d`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`), as.numeric), 
          across(c(Outcome,`Ventilation`), factor)) %>%
@@ -654,7 +659,9 @@ data_for_regres <- data_e %>% select (ID, Sex, Age, `anti-HCV`, `Hbs_AG`,  `LMCA
 
 # add corrected SNP data
 
-hosp_poly_group_nlr  <- left_join(data_for_regres, hospital_polymorf_e[,1:11], by = "ID" )  %>%  select (!ID) %>% filter(!is.na(Ventilation))
+hosp_poly_group_nlr  <- left_join(data_for_regres, hospital_polymorf_e[,1:11], by = "ID" ) %>%  
+                              select (!ID) %>% 
+                              filter(!is.na(Ventilation))
 
 #Achieve corrected  dataset with right names and correct variables types
 
@@ -670,9 +677,354 @@ hosp_poly_group_nlr %>% group_by(`BD_group`)  %>% tally ()
 
 ```{r}
 
-discharged <- hosp_poly_group_nlr %>% filter(Outcome == "0") %>%  select (!c(Outcome, `Ventilation_d`))
+discharged <- hosp_poly_group_nlr %>% filter(Outcome == "0") %>%  select (!c(Outcome, `Ventilation_d`)) %>%  filter(!is.na(Ventilation))
 discharged$Ventilation
 ```
+### Principal component analysis
+
+Get NUMERIC variables for day 0, demographic data, diagnosis group, and calculated NLR, DNA
+
+```{r}
+library(factoextra)
+library(FactoMineR)
+library(ggbiplot) 
+
+#str(hosp_poly_group_nlr) 
+
+#check how many NA among chosen variables 
+
+na_count <-sapply(discharged, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+
+#delete variables with more than 60 NA's (more than 11%)
+
+full_nums <- discharged %>% select (!c(LMCA, `8ohdg_1d`,`Lactate_1d`,
+                                                `Alcaline_phosphatase_1d`, `Uric_acid_1d`, `GGT_1d`, 
+                                                `Chloride_1d`, `Pneumonia_deterioration_d`, `8ohdg 1d log`,`FSCCRR_bed-days`)) %>% 
+                                    select (BD_group, Ventilation, diseaseGroup, where(is.numeric)) %>% drop_na()
+# got a tibble:302 × 29
+```
+
+Run PCA analysis for all numeric variables, chosen above
+
+```{r}
+hospital.full.pca <- prcomp(full_nums[,-(1:3)], 
+                scale = T) # scaling
+summary(hospital.full.pca)
+
+contr_1a <- fviz_contrib(hospital.full.pca, choice = "var", axes = 1) 
+contr_2a <- fviz_contrib(hospital.full.pca, choice = "var", axes = 2) 
+
+fviz_eig (hospital.full.pca, addlabels = T, ylim = c (0,50))
+pca_graph <- fviz_pca_var(hospital.full.pca, col.var = "contrib")
+pca_graph
+```
+
+Biplot for Ventilation demand ( 0 = NO, 1 = YES)
+
+```{r}
+biplot0 <- ggbiplot(hospital.full.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = full_nums$Ventilation) +
+         labs(title = "PCA of yield contributing parameters")
+biplot0
+```
+Biplot for BED-DAYS at center ( "0-30", "30-46", "46-67", "67-401"  )
+
+```{r}
+biplot_BD <- ggbiplot(hospital.full.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = full_nums$`BD_group`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_BD
+```
+
+Get less predictors, additionally exclude lab test results (except NLR) and components of CIRS-G composit score
+
+```{r}
+# Get less predictors, additionally exclude lab test results (except NLR) and components of CIRS-G composit score
+
+unlist(colnames (full_nums))
+
+small_pca <- discharged  %>% select (Ventilation, BD_group, diseaseGroup, Age, CGS, CCI_1d,  `CIRS-G_sum_1d`, 
+                                            `FOUR_1d`, `NLR_1d`, `ICU_FSCCRR_d`) %>% drop_na()
+
+
+hospital.pca <- prcomp(small_pca[,-(1:3)], 
+                scale = T) # шкалирование нужно так как датафрейм подаем не шкалированный
+summary(hospital.pca)
+# birth.pca$rotation
+
+# графическая визуализация доли объясненной изменчивости для каждой из компонент
+fviz_eig (hospital.pca, addlabels = T, ylim = c (0,50))
+
+contrib_1 <- fviz_contrib(hospital.pca, choice = "var", axes = 1) 
+contrib_2 <- fviz_contrib(hospital.pca, choice = "var", axes = 2) # axes - номер комоненты, из чего состоит каждая компонента?
+contrib_1
+contrib_2
+pca_sm_graph <- fviz_pca_var(hospital.pca, col.var = "contrib")
+pca_sm_graph
+
+
+```
+
+Biplot for Ventilation demand ( 0 = NO, 1 = YES)
+
+```{r}
+biplot2 <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$Ventilation) +
+         labs(title = "PCA of yield contributing parameters")
+biplot2
+```
+
+Biplot for BED-DAYS at center ( "0-30", "30-46", "46-67", "67-401"  )
+
+```{r}
+biplot_BD_sm <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$`BD_group`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_BD_sm
+```
+
+Biplot for desiase_group
+
+```{r}
+biplot_des_sm <- ggbiplot(hospital.pca, 
+         scale=0, alpha = 0.3, ellipse = TRUE, groups = small_pca$`diseaseGroup`) +
+         labs(title = "PCA of yield contributing parameters")
+biplot_des_sm
+```
+
+```{r}
+library (plotly)
+
+
+hospital.pca <- prcomp(small_pca[,-(1:3)], 
+                scale = , rank. = 3)
+
+     components <- hospital.pca[["x"]]
+     
+components <- data.frame(components)
+components$PC2 <- -components$PC2
+components$PC3 <- -components$PC3
+components = cbind(components, small_pca$Ventilation)
+
+#tot_explained_variance_ratio <- summary( hospital.pca)[["importance"]]['Proportion of Variance',]
+#ot_explained_variance_ratio <- 100 * sum(tot_explained_variance_ratio)
+
+tit = 'Total Explained Variance of components = 98'
+
+fig <- plot_ly(components, x = ~PC1, y = ~PC2, z = ~PC3, color = ~small_pca$Ventilation, colors = c('#EF553B','#00CC96') ) %>%
+  add_markers(size = 12)
+
+
+fig <- fig %>%
+  layout(
+    title = tit,
+    scene = list(bgcolor = "white")
+)
+
+fig
+
+```
+
+
+```{r}
+library (plotly)
+
+
+hospital.pca <- prcomp(small_pca[,-(1:3)], 
+                scale = T )
+#summary(hospital.pca)
+
+components1 <- hospital.pca[["x"]]
+     
+components1 <- data.frame(components1[,1:3])
+components1$PC2 <- -components1$PC2
+components1$PC3 <- -components1$PC3
+components1 = cbind(components1, small_pca$Ventilation)
+
+#tot_explained_variance_ratio <- summary( hospital.pca)[["importance"]]['Proportion of Variance',]
+#tot_explained_variance_ratio <- 100 * sum(tot_explained_variance_ratio)
+
+tit = 'Total Explained Variance of first k=3 (out of 7) components = 77%'
+
+fig <- plot_ly(components1, x = ~PC1, y = ~PC2, z = ~PC3, color = ~small_pca$Ventilation, colors = c('#EF553B','#00CC96') ) %>%
+  add_markers(size = I(200))
+
+
+fig <- fig %>%
+  layout(
+    title = tit,
+    scene = list(bgcolor = "white")
+)
+
+fig
+
+```
+
+```{r}
+components1 = cbind(components1, small_pca$BD_group)
+
+#tot_explained_variance_ratio <- summary( hospital.pca)[["importance"]]['Proportion of Variance',]
+#tot_explained_variance_ratio <- 100 * sum(tot_explained_variance_ratio)
+
+tit = 'Total Explained Variance of first k=3 (out of 7) components = 77%'
+
+fig <- plot_ly(components1, x = ~PC1, y = ~PC2, z = ~PC3, color = ~small_pca$BD_group, colors = c('#EF553B','#00CC96', '#636EFA', '#EEB422')) %>%
+  add_markers(size = I(200))
+
+
+fig_BD <- fig %>%
+  layout(
+    title = tit,
+    scene = list(bgcolor = "white")
+)
+
+fig_BD
+
+?plot_ly
+
+```
+
+```{r}
+components_d = cbind(components1, small_pca$diseaseGroup)
+
+#tot_explained_variance_ratio <- summary( hospital.pca)[["importance"]]['Proportion of Variance',]
+#tot_explained_variance_ratio <- 100 * sum(tot_explained_variance_ratio)
+
+tit = 'Total Explained Variance of first k=3 (out of 7) components = 77%'
+
+fig <- plot_ly(components_d, x = ~PC1, y = ~PC2, z = ~PC3, color = ~small_pca$diseaseGroup, colors = c('#EF553B','#00CC96', '#636EFA', '#EEB422')) %>%
+  add_markers(size = I(200))
+
+
+fig_dis <- fig %>%
+  layout(
+    title = tit,
+    scene = list(bgcolor = "white")
+)
+
+fig_dis
+
+```
+
+```{r}
+library(plotly)
+library(stats)
+library(MASS)
+
+
+
+hospital.pca <- prcomp(small_pca[,-(1:3)], 
+                scale = T )
+components2 <- hospital.pca[["x"]]
+     
+components2 <- data.frame(components2[,1:4])
+components2$PC2 <- -components2$PC2
+components2$PC3 <- -components2$PC3
+components2 = cbind(components2, small_pca$Ventilation)
+colnames(components2)[5] = 'Ventilation'
+
+
+tot_explained_variance_ratio <- summary(prin_comp)[["importance"]]['Proportion of Variance',]
+tot_explained_variance_ratio <- 100 * sum(tot_explained_variance_ratio)
+
+tit = 'Total Explained Variance = 99.56'
+
+axis = list(showline=FALSE,
+            zeroline=FALSE,
+            gridcolor='#ffff',
+            ticklen=4)
+
+fig2 <- components2 %>%
+  plot_ly() %>%
+  add_trace(
+    type = 'splom',
+    dimensions = list(
+      list(label='PC1', values=~PC1),
+      list(label='PC2', values=~PC2),
+      list(label='PC3', values=~PC3),
+      list(label='PC4', values=~PC4)
+    ),
+    color=~Ventilation,
+    marker = list(
+      size = 7
+    )
+  ) %>% style(diagonal = list(visible = F)) %>%
+  layout(
+    title= tit,
+    hovermode='closest',
+    dragmode= 'select',
+    plot_bgcolor='rgba(240,240,240, 0.95)',
+    xaxis=list(domain=NULL, showline=F, zeroline=F, gridcolor='#ffff', ticklen=4),
+    yaxis=list(domain=NULL, showline=F, zeroline=F, gridcolor='#ffff', ticklen=4),
+    xaxis2=axis,
+    xaxis3=axis,
+    xaxis4=axis,
+    yaxis2=axis,
+    yaxis3=axis,
+    yaxis4=axis
+  )
+options(warn=-1)
+fig2
+```
+
+
+```{r}
+
+hospital.pca <- prcomp(small_pca[,-(1:3)], 
+                scale = T )
+summary (hospital.pca)
+components3 <- hospital.pca[["x"]]
+     
+components3 <- data.frame(components2[,1:4])
+components3$PC2 <- -components3$PC2
+components3$PC3 <- -components3$PC3
+components3 = cbind(components3, small_pca$BD_group)
+colnames(components3)[5] = 'Bed-days'
+
+
+tit = 'Total Explained Variance for PC1-PC4 = 87'
+
+axis = list(showline=FALSE,
+            zeroline=FALSE,
+            gridcolor='#ffff',
+            ticklen=4)
+
+fig3 <- components3 %>%
+  plot_ly() %>%
+  add_trace(
+    type = 'splom',
+    dimensions = list(
+      list(label='PC1', values=~PC1),
+      list(label='PC2', values=~PC2),
+      list(label='PC3', values=~PC3),
+      list(label='PC4', values=~PC4)
+    ),
+    color=~`Bed-days`,
+    marker = list(
+      size = 7
+    )
+  ) %>% style(diagonal = list(visible = F)) %>%
+  layout(
+    title= tit,
+    hovermode='closest',
+    dragmode= 'select',
+    plot_bgcolor='rgba(240,240,240, 0.95)',
+    xaxis=list(domain=NULL, showline=F, zeroline=F, gridcolor='#ffff', ticklen=4),
+    yaxis=list(domain=NULL, showline=F, zeroline=F, gridcolor='#ffff', ticklen=4),
+    xaxis2=axis,
+    xaxis3=axis,
+    xaxis4=axis,
+    yaxis2=axis,
+    yaxis3=axis,
+    yaxis4=axis
+  )
+options(warn=-1)
+fig3
+```
+
+
+### Univariate regression for all variables (at time point 0)
 
  Run regression for all variables of interest
 
