@@ -17,6 +17,8 @@ library(ggsurvfit)
 library(anytime)
 library(SNPassoc)
 library(aod)
+library(factoextra)
+library(StatMatch)
 ```
 
 ## R Markdown
@@ -29,25 +31,13 @@ library(aod)
 
 ```{r cars}
 data <- read_csv2("data.csv")
-
-data$`Дата перевода в ФНКРР`[191] <- "09.11.2018"
-data$`Дата мозговой катастрофы`[8] <- "01.01.2014"
-data$`Дата мозговой катастрофы`[169] <- "12.09.2017"
-data$`Дата мозговой катастрофы`[321] <- "01.01.2014"
-
-data <- data %>% mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`),
-                     `Дата перевода в ФНКРР` = dmy(substr(`Дата перевода в ФНКРР`, start=1, stop=8)),
-                     `Дата выписки из ФНКЦ РР` = dmy(`Дата выписки из ФНКЦ РР`)
-                     )
-
 ```
+
 ```{r}
 ########Уберем нд и нормализуем внк ДНК
 data <- data %>%
   mutate(across(everything(), ~na_if(as.character(.), "н/д")))
 
-#data <- data %>%
-  #mutate(`Дата мозговой катастрофы` = dmy(`Дата мозговой катастрофы`))
 target_columns <- c("внкДНК, нг/мл 1d", "8ohdg на миллион оснований 1d",
                     "внкДНК, нг/мл 5d", "8ohdg на миллион оснований 5d")
 
@@ -191,8 +181,18 @@ noquote(colnames(data))
 Расчитаем срок до перевода в ФНКЦРР (`До_перевода_ФКЦРР_д`) и проведем вычистку переменных исхода (н/д заменим на NA, исход 2 на NA), переменных ПОЛ
 
 ```{r }
+data$`Дата_перевода_ФНКЦРР`[191] <- "09.11.2018"
+data$`Дата_мозговой_катастрофы`[8] <- "01.01.2014"
+data$`Дата_мозговой_катастрофы`[169] <- "12.09.2017"
+data$`Дата_мозговой_катастрофы`[321] <- "01.01.2014"
 
-data <- data %>% mutate (`До_перевода_ФКЦРР_д` = as.Date(data $`Дата_перевода_ФНКЦРР` , format="%d-%m-%Y")- as.Date(data $`Дата_мозговой_катастрофы`, format="%d-%m-%Y")) %>% mutate(`Потребность_ИВЛ` = ifelse(`Потребность_ИВЛ` =="н/д", NA, `Потребность_ИВЛ`), `Исход` = ifelse( `Исход` == 2, NA, `Исход`),
+data <- data %>% mutate(`Дата_мозговой_катастрофы` = dmy(`Дата_мозговой_катастрофы`),
+                     `Дата_перевода_ФНКЦРР` = dmy(substr(`Дата_перевода_ФНКЦРР`, start=1, stop=8)),
+                     `Дата_выписки_ФНКЦРР` = dmy(`Дата_выписки_ФНКЦРР`),
+                     `До_перевода_ФКЦРР_д` = as.numeric(`Дата_перевода_ФНКЦРР` - `Дата_мозговой_катастрофы`)
+                     )
+
+data <- data %>% mutate(`Потребность_ИВЛ` = ifelse(`Потребность_ИВЛ` =="н/д", NA, `Потребность_ИВЛ`), `Исход` = ifelse( `Исход` == 2, NA, `Исход`),
  `Пол` = case_when(`Пол` == 'ж' ~ 'Ж', `Пол` == 'м' ~ 'М', .default = `Пол`),
  `Пневмония` = case_when(`Пневмония` == 1 ~ "Eсть", `Пневмония` == 0 ~ "Нет", TRUE ~ NA),
  `Инфекция` = case_when(grepl("1",`Инфекция` ) ~ "Eсть", `Инфекция` == 0 ~ "Нет", TRUE ~ NA)) 
@@ -1033,6 +1033,164 @@ summary(fit_nlr_gr1)
 fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hospital_polymorf_group_nlr)
 summary(fit_nlr_2)
 # Полиморфизм/ NLR не ассоциированы... Последствия ЧМТ?
+```
+
+
+### Устин Кластерный анализ
+
+
+Готовим данные
+```{r}
+data <- data %>% 
+  mutate(
+    Пол = as.factor(Пол),
+    HTR1A_rs6295 = as.factor(HTR1A_rs6295),
+    AQP4_rs1058427 = as.factor(AQP4_rs1058427),
+    BDNF_rs6265 = as.factor(BDNF_rs6265),
+    OLR1_rs11053646 = as.factor(OLR1_rs11053646),
+    NRF2_rs6726395 = as.factor(NRF2_rs6726395),
+    AGTR1_rs275651 = as.factor(AGTR1_rs275651),
+    AQP5_rs3759129 = as.factor(AQP5_rs3759129),
+    TLR9_rs352162 = as.factor(TLR9_rs352162),
+    AQP_rs3736309 = as.factor(AQP_rs3736309),
+    `анти-HCV` = as.factor(`анти-HCV`),
+    Hbs_AG = as.factor(Hbs_AG),
+    ЛСМА = as.factor(ЛСМА %>% na_if("?")),
+    Основной_диагноз_код_МКБ10 = as.factor(Основной_диагноз_код_МКБ10),
+    Пневмония = as.factor(Пневмония),
+    Инфекция = as.factor(Инфекция),
+    CGS_балл = as.factor(CGS_балл),
+    Пневмония_возникшая_ФНКЦРР = as.factor(Пневмония_возникшая_ФНКЦРР),
+    Исход = as.factor(Исход),
+    Уросептическая_инфекция = as.factor(Уросептическая_инфекция),
+    `Сепсис/септический_шок` = as.factor(`Сепсис/септический_шок`),
+    `Потребность_ИВЛ` = as.factor(`Потребность_ИВЛ`),
+    `Ухудшение_пневмонии_сутки` = as.factor(`Ухудшение_пневмонии_сутки`),
+    TLR9_rs187084 = as.factor(TLR9_rs187084),
+    t_при_поступлении = as.double(t_при_поступлении),
+    across(starts_with("Индекс_коморбидности_Чарлсона"), as.numeric),
+    across(starts_with("CIRS-G"), as.double),
+    across(starts_with("FOUR"), as.double),
+    across(starts_with("SOFA"), as.double),
+    across(starts_with("WBC"), as.double),
+    across(starts_with("NEU"), as.double),
+    across(starts_with("LYM"), as.double),
+    across(starts_with("PLT"), as.double),
+    across(starts_with("Лактат"), as.double),
+    across(starts_with("Креатинин"), as.double),
+    across(starts_with("АЛТ"), as.double),
+    across(starts_with("АСТ"), as.double),
+    across(starts_with("Альбумин"), as.double),
+    across(starts_with("Щелочная_фосфотаза"), as.double),
+    across(starts_with("Мочевая_кислота"), as.double),
+    across(starts_with("Мочевина"), as.double),
+    across(starts_with("ГГТ"), as.double),
+    across(starts_with("Калий"), as.double),
+    across(starts_with("Натрий"), as.double),
+    across(starts_with("Хлорид"), as.double),
+    across(starts_with("АЧТВ"), as.double),
+    across(starts_with("МНО"), as.double),
+    across(starts_with("Фибриноген"), as.double),
+    across(starts_with("ПВ"), as.double),
+    `Койко-дни_ФНКЦРР` = as.numeric(`Койко-дни_ФНКЦРР`),
+    Дни_ОРИТ_ФНКЦРР = as.numeric(Дни_ОРИТ_ФНКЦРР),
+    ИВЛ_д = as.numeric(ИВЛ_д)
+    )
+
+cldata <- data %>% select(-c(Номер, Часть, Номер_референс, ID, starts_with("Дата"), внкДНК_1d, внкДНК_5d, `8ohdg_1d`, `8ohdg_5d`, `8ohdg на миллион оснований 1d лог`, `8ohdg 5d лог`, Диагноз, `Койко-дни_ФНКЦРР`, Исход ))
+
+# cldata <- cldata %>% mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .)),
+#                             across(where(is.factor), ~ ifelse(is.na(.), mode(.), .)),
+#                             across(where(is.numeric), ~ scale(.)[,1]))
+```
+
+```{r}
+set.seed(240)
+```
+
+
+1) PAM
+
+Оценим количество потенциальных кластеров
+
+```{r}
+slh <- c()
+slh = c(slh, NA)
+for(i in 2:100){
+  pam_clusters = pam(ddist,
+                     diss = TRUE,
+                     k = i)
+  slh = c(slh ,pam_clusters$silinfo$avg.width)
+}
+plot(1:100, slh,
+     xlab = "Clusters",
+     ylab = "Silhouette Width")
+lines(1:100, slh)
+```
+
+```{r}
+ddist <- daisy(cldata, metric="gower")
+
+# PAM кластеризация
+pam_res <- pam(ddist, k = 4, diss=T)
+pam_res$data <- cldata
+pam_sil <- silhouette(pam_res$clustering, ddist)
+mean(pam_sil[, 3])
+
+fviz_cluster(pam_res)
+
+
+```
+
+```{r}
+pvdf <- tibble(nclusters = numeric(), Исход = numeric(), `Койко-дни` = numeric())
+for (i in 2:70) {
+   res <- pam(ddist, k=i, diss=T)
+   pv <- chisq.test(table(res$clustering, data$Исход))$p.value
+   pv2 <- tidy(aov(data$`Койко-дни_ФНКЦРР`~res$clustering))$p.value[1]
+   pvdf <- pvdf %>% add_row(nclusters=i, Исход=pv, `Койко-дни`=pv2)
+}
+
+pvdf
+```
+```{r}
+ggplot(data %>% mutate(Cluster = pam_res$clustering), aes(x = Исход, fill = factor(Cluster))) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(label=Cluster, x =Исход), stat="count", position=position_dodge(0.9)) +
+  labs(x = "Исход", fill = "Кластер")
+```
+```{r}
+data %>% mutate(
+  Cluster = pam_res$clustering,
+  Дни = cut(`Койко-дни_ФНКЦРР`,
+                       breaks = c(-Inf, 25, 50, 75, 100, 125, 150, 175, 200, Inf),  # Интервалы
+                       labels = c("меньше 25", "25-50", "50-75", "75-100", "100-125", "125-150", "150-175", "175-200", "больше 200"),
+                       right = TRUE)
+  ) %>% 
+  ggplot(aes(x = Дни, fill = factor(Cluster))) +
+    geom_bar(position = "dodge") +
+    geom_text(aes(label=Cluster, x =Дни), stat="count", position=position_dodge(0.9)) +
+    labs(x = "Дни в ФНКЦ РР", fill = "Кластер")
+```
+
+
+
+2) Hierarchical clustering
+```{r}
+hc <- hclust(
+  ddist,
+  method="ward.D2"
+)
+
+plot(hc)
+rect.hclust(hc, k=3)
+```
+
+Выберем количество кластеров и визуализируем результаты
+
+```{r}
+hclusters <- cutree(hc, k=3)
+fviz_cluster(list(data=cldata, cluster=hclusters))
 ```
 
 
