@@ -563,60 +563,6 @@ data %>%
   )
 ```
 
-```{r}
-data_no_na_dates <- data %>% filter(!is.na(`Дата_выписки_ФНКЦРР`)) %>% filter(!is.na(`Дата_выписки_ФНКЦРР`))
-
-forcrmp <- data_no_na_dates %>%
-  mutate(
-    time = `Койко-дни_ФНКЦРР` %>% as.numeric(),
-    status = case_when(
-      `Исход` == "0" ~ "Выписка",
-      `Исход` == "1" ~ "Смерть",
-      `Исход` == "2" ~ "Цензура"
-    ) %>% factor(levels = c("Цензура", "Смерть", "Выписка"))
-  ) %>% 
-  select(time, status, `Уросептическая_инфекция`, diseaseGroup, Исход)
-```
-
-
-## Competing risk regression
-```{r}
-crr_mod <- crr(Surv(time, status) ~ `Уросептическая_инфекция`, forcrmp)
-crr_mod
-```
-
-```{r}
-tbl <- 
-  crr_mod %>%
-  gtsummary::tbl_regression(exponentiate = TRUE) %>%
-  gtsummary::add_global_p() %>%
-  add_n(location = "level")
-```
-## Cumulative incidence
-```{r}
-cuminc(Surv(time, status) ~ 1, forcrmp)
-```
-
-```{r}
-cuminc(Surv(time, status) ~ 1, forcrmp) %>%
-  ggcuminc(c('Смерть', 'Выписка')) +
-  add_confidence_interval('ribbon') +
-  add_risktable(risktable_stats = c("n.risk", "cum.event", 'cum.censor')) +
-  scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))
-```
-
-
-```{r}
-cuminc(Surv(time, status) ~ diseaseGroup, forcrmp)
-```
-
-```{r}
-cuminc(Surv(time, status) ~ diseaseGroup, forcrmp) %>%
-  ggcuminc(c('Смерть', 'Выписка')) +
-  scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))+
-  add_risktable()
-```
-
 ### ЛЕНА Графики состояния пациентов в точке 0
 
 ```{r fig.width= 10, fig.height=8}
@@ -1131,6 +1077,63 @@ summary(fit_nlr_2)
 ```
 
 
+## Устин Competing risk regression
+
+```{r}
+data_no_na_dates <- data %>% filter(!is.na(`Дата_выписки_ФНКЦРР`)) %>% filter(!is.na(`Дата_выписки_ФНКЦРР`))
+
+forcrmp <- data_no_na_dates %>%
+  mutate(
+    time = `Койко-дни_ФНКЦРР` %>% as.numeric(),
+    status = case_when(
+      `Исход` == "0" ~ "Выписка",
+      `Исход` == "1" ~ "Смерть",
+      `Исход` == "2" ~ "Цензура"
+    ) %>% factor(levels = c("Цензура", "Смерть", "Выписка"))
+  ) %>% 
+  select(time, status, `Уросептическая_инфекция`, diseaseGroup, Исход)
+```
+
+
+
+```{r}
+crr_mod <- crr(Surv(time, status) ~ `Уросептическая_инфекция`, forcrmp)
+crr_mod
+```
+
+```{r}
+tbl <- 
+  crr_mod %>%
+  gtsummary::tbl_regression(exponentiate = TRUE) %>%
+  gtsummary::add_global_p() %>%
+  add_n(location = "level")
+```
+
+## Устин Cumulative incidence
+```{r}
+cuminc(Surv(time, status) ~ 1, forcrmp)
+```
+
+```{r}
+cuminc(Surv(time, status) ~ 1, forcrmp) %>%
+  ggcuminc(c('Смерть', 'Выписка')) +
+  add_confidence_interval('ribbon') +
+  add_risktable(risktable_stats = c("n.risk", "cum.event", 'cum.censor')) +
+  scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))
+```
+
+
+```{r}
+cuminc(Surv(time, status) ~ diseaseGroup, forcrmp)
+```
+
+```{r}
+cuminc(Surv(time, status) ~ diseaseGroup, forcrmp) %>%
+  ggcuminc(c('Смерть', 'Выписка')) +
+  scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))+
+  add_risktable()
+```
+
 ### Устин Кластерный анализ
 
 
@@ -1204,7 +1207,7 @@ set.seed(240)
 ```
 
 
-1) PAM
+PAM
 
 Оценим количество потенциальных кластеров
 
@@ -1268,18 +1271,6 @@ data %>% mutate(
     labs(x = "Дни в ФНКЦ РР", fill = "Кластер")
 ```
 
-
-
-2) Hierarchical clustering
-```{r}
-hc <- hclust(
-  ddist,
-  method="ward.D2"
-)
-
-plot(hc)
-rect.hclust(hc, k=3)
-```
 
 Выберем количество кластеров и визуализируем результаты
 
