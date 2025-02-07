@@ -114,6 +114,11 @@ data <- data %>%
                                                       `8ohdg 5d log`))
 
 data
+
+data[data == "н/Д" | 
+    data == "нд" | 
+  data == "Н/Д"] <- NA
+
 ```
 
 ```{r}
@@ -789,6 +794,7 @@ model <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморби
                CGS_балл + oneday_log + `8ohdg 1d log`, 
              data = data, 
              family = binomial)
+summary(model)
 ######LR ratio
 data_clean <- na.omit(data[, c("Исход", "Возраст", "SOFA_1d", 
                                "Индекс_коморбидности_Чарлсона_1d", 
@@ -847,11 +853,9 @@ dag <- dagitty("dag {
   Age -> SOFA_1d
   Age -> Charlson_Index_1d
   Age -> CGS_Score
+  Charlson_Index_1d -> CGS_Score
+  Charlson_Index_1d -> SOFA_1d
   
-  oneday_log -> SOFA_1d
-  oneday_log -> Charlson_Index_1d
-  8hdg_1d_log -> SOFA_1d
-  8hdg_1d_log -> Charlson_Index_1d
 }")
 
 
@@ -871,8 +875,7 @@ dag_plot <- ggdag(dag) +
 model_dag <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                    CGS_балл + oneday_log + `8ohdg 1d log` +
                    Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                   Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                   `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                   Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
                  data = data, 
                  family = binomial)
 model_dag
@@ -917,8 +920,7 @@ data_center$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = 
 model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                         CGS_балл + oneday_log + `8ohdg 1d log` +
                         Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                        Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                        `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                        Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
                       data = data_center, 
                       family = binomial)
 vif_results_dagcentr <- vif(model_dagcentr)
@@ -955,21 +957,115 @@ model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_
 model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
                     CGS_балл + oneday_log + `8ohdg 1d log` +
                     Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                    Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                    `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+                    Индекс_коморбидности_Чарлсона_1d:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Возраст:CGS_балл,
                   data = data_clean_center, 
                   family = binomial)
 
 lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
 
 print(lrt_result_combo)
+
+######stepwise regression and knn stuff
+library(tidymodels)
+library(recipes)
+library(MASS)
+data_for_regres2 <- data[, c( "Пол", "Возраст",   "Пневмония", 
+                             "Инфекция",  "CGS_балл", "Индекс_коморбидности_Чарлсона_1d", 
+                             "CIRS-G_сумма_1d", "CIRS-G_систем_с_паталогиями_5d_36", 
+                             "CIRS-G_индекс_тяжести_1d", "FOUR_1d", "SOFA_1d", 
+                             "WBC_1d", "NEU_#_1d",  "LYM_#_1d", 
+                              "PLT_1d", "Лактат_1d", "Креатинин_1d", "АЛТ_1d", 
+                             "АСТ_1d", "Альбумин_1d", "Щелочная_фосфотаза_1d", "Мочевая_кислота_1d", 
+                             "Мочевина_1d", "ГГТ_1d", "Калий_1d", "Натрий_1d", "Хлорид_1d", 
+                             "АЧТВ_1d", "МНО_1d", "Фибриноген_1d", "ПВ_1d", "Уросептическая_инфекция", 
+                             "Сепсис/септический_шок", "Потребность_ИВЛ",  
+                             "ИВЛ_д",  "Койко-дни_ФНКЦРР", "Исход", 
+                             "Пневмония_возникшая_ФНКЦРР", "oneday_log", "8ohdg 1d log")]
+
+data_for_regres2 <- data_for_regres2 %>%
+  mutate(
+    Пол = ifelse(Пол == "м", 1, 2),  # м -> 1, ж -> 2
+    Пневмония = ifelse(Пневмония == "есть", 1, 2),  
+    Инфекция = ifelse(Инфекция == "есть", 1, 2)
+  )
+data_for_regres2[] <- lapply(data_for_regres2, function(x) {
+  if (!is.numeric(x)) as.numeric(as.character(x)) else x
+})
+rec <- recipe(Исход ~ ., data = data_for_regres2) %>%
+  step_impute_knn(all_predictors(), neighbors = 5)
+
+rec_prep <- prep(rec)
+data_imputed <- bake(rec_prep, new_data = NULL)
+sum(is.na(data_for_regres2))  
+sum(is.na(data_imputed))      
+model_glm <- glm(Исход ~ ., data = data_imputed, family = binomial)
+stepwise_model_glm <- stepAIC(model_glm, direction = "both", trace = TRUE)
+summary(stepwise_model_glm)
+summary(stepwise_model_glm)
+
+
+summary(stepwise_model_glm)
+vif(stepwise_model_glm)
+
+
 ```
 
 ```{r}
 
 ```
 
-###Регрессионный анализ для поиска ассоциации:
+### Лена унивариантный регрессия для всех переменных:
+
+```{r}
+# подготовить такой датасет лучше где -то выше (все переменные + включить группировку, обработанные полиморфизмы и NLR)
+
+data_for_regres <- data %>% select (ID, Пол, Возраст, `анти-HCV`, `Hbs_AG`,  `ЛСМА`, Пневмония, Инфекция, diseaseGroup, CGS_балл, Индекс_коморбидности_Чарлсона_1d,`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`, `CIRS-G_индекс_тяжести_1d`, FOUR_1d, SOFA_1d, внкДНК_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`,  `PLT_1d`, `Лактат_1d`, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, `Сепсис/септический_шок`, `Потребность_ИВЛ`, `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`, `Исход`, `Пневмония_возникшая_ФНКЦРР`, `oneday_log`, `8ohdg 1d log` ) %>% mutate(across(c(`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`,`CIRS-G_индекс_тяжести_1d`,`FOUR_1d`, `WBC_1d`, `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`, `PLT_1d`, `Лактат_1d`, `Креатинин_1d` , `АЛТ_1d`, `АСТ_1d`, `Альбумин_1d`, `Щелочная_фосфотаза_1d`, `Мочевая_кислота_1d`, `Мочевина_1d` , `ГГТ_1d`, `Калий_1d`, `Натрий_1d`, `Хлорид_1d`, `АЧТВ_1d`, `МНО_1d`,`Фибриноген_1d`, ПВ_1d , `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`), as.numeric), across(c(Исход,`Потребность_ИВЛ`), factor)) 
+
+
+hosp_poly_group <- left_join(data_for_regres, hospital_polymorf[,1:11], by = "ID" )
+
+hosp_poly_group_nlr <- left_join(hosp_poly_group, NLR_data, by = "ID" ) %>% select (-ID)
+
+#Получили полный датасет, включая новые переменные и отредактированные исходные c правильным типом
+summary(hosp_poly_group_nlr)
+colnames(hosp_poly_group_nlr)
+```
+
+Построим унивариантную регрессию для [ИСХОДА]
+
+```{r}
+
+library(broom)
+library(openxlsx)
+
+x = names(hosp_poly_group_nlr[,-48])
+out <- unlist(lapply(48, function(n) combn(x, 1, FUN=function(row) paste0("Исход ~ ", paste0("`",row, "`",collapse = "+")))))
+out
+
+#regression coefficients
+tmp1 = bind_rows(lapply(out, function(frml) {
+ a = tidy(glm(frml, data= hosp_poly_group_nlr, family = binomial))
+ a$frml = frml
+ return(a)
+}))
+
+tmp1
+
+#regression results R2, AIC, BIC
+tmp2 = bind_rows(lapply(out, function(frml) {
+ a = glance(lm(frml, data=hosp_poly_group_nlr))
+ a$frml = frml
+ return(a)
+}))
+tmp2
+
+signif_estim_univar <- as_data_frame(tmp1) %>% filter (`p.value` <= 0.05)
+write.xlsx(signif_estim_univar, 'signif_estim_univar_glm.xlsx')
+
+#signif_results_univar<- as_data_frame(tmp2)
+#write.xlsx(signif_estim_univar, 'signif_results_univar_glm.xlsx')
+```
+###  Лена Регрессионный анализ для поиска ассоциации:
 
 Проверить гипотезы о взаимодействии (для всей выборки и в стратах)
 ○ Полиморфизм гена TLR9 (рецептор) и внеклеточной ДНК 
@@ -982,27 +1078,26 @@ In nuclear and mitochondrial DNA, 8-hydroxy-2' -deoxyguanosine (8-OHdG) or 8-oxo
 ```{r}
 
 disease_group_id <- data %>% select (ID, Возраст, SOFA_1d,  diseaseGroup, oneday_log, `8ohdg 1d log`, CGS_балл,`Индекс_коморбидности_Чарлсона_1d`, `Койко-дни_ФНКЦРР`)
-hospital_polymorf_group <- left_join(hospital_polymorf, disease_group_id, by = "ID" )
 
- 
+
 
 #  `ИСХОД` БЕЗ ГРУППИРОВКИ
-fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hospital_polymorf_group, family = binomial)
+fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr)
 # Полиморфизм/ ДНК нет значимой ассоциации предикторов с исходом (выписка, смерть)
 
 #  `ИСХОД` C ГРУППИРОВКОЙ
-fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_gr)
 # Полиморфизм/ ДНК не ассоциированы...Последствие ЧМТ ухудшает прогноз (ур знач 0,05)
 
 #  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hospital_polymorf_group, family = binomial)
+fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_1)
 # Полиморфизм/ ДНК не ассоциированы...Гипоксия ассоциирована с увеличением вероятности потребности в ИВЛ (ур знач 0,05)
 
 #  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hospital_polymorf_group)
+fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_tlr_2)
 # Полиморфизм/ ДНК не ассоциированы... Группа Последствие ЧМТ - положительная ассоциация с кол-вом койко-дней и отрицательная для Группы Новообразования
 
@@ -1012,7 +1107,7 @@ summary(fit_tlr_2)
 ##### Cвязь полиморфизма гена AQP4 (рецептор) и уровня показателя NLR
 
 ```{r}
-hospital_polymorf_group_nlr <- left_join(hospital_polymorf_group, NLR_data, by = "ID")
+
 ```
 
 ```{r}
@@ -1020,17 +1115,17 @@ hospital_polymorf_group_nlr <- left_join(hospital_polymorf_group, NLR_data, by =
 #  !!!!!! огромные std errors ??????
 
 #  `ИСХОД` C ГРУППИРОВКОЙ
-fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr)
 # NLR_1 ассоциирован с исходом (эффект незначителен?), страта не ассоциирована
 
 #  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hospital_polymorf_group_nlr, family = binomial)
+fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr1)
 ## NLR_1 ассоциирован с исходом (эффект незначителен?), новообразование?
 
 #  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hospital_polymorf_group_nlr)
+fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_nlr_2)
 # Полиморфизм/ NLR не ассоциированы... Последствия ЧМТ?
 ```
