@@ -654,50 +654,79 @@ ggplot(data) +
 
 #write.csv(data,"data250124.csv", row.names = T) 
 
-```
-Женя корреляции и логистическая регрессия
+Correlation analysis
 ```{r}
 library(ggplot2)
 library(reshape2)
 library(car)
-names(data)
+library(dplyr)
+library(corrplot)
+library(RColorBrewer)
 
-
-
-target_columns <- c(
-  "Индекс_коморбидности_Чарлсона_1d",
-  "CGS_балл",
-  "Возраст",
+target_columns_renamed <- c(
+  "Charlson_Comorbidity_Index_1d",
+  "CGS_Score",
+  "Age",
   "FOUR_1d",
   "SOFA_1d",
   "WBC_1d",
   "NEU_#_1d",
   "LYM_#_1d",
   "PLT_1d",
-  "Лактат_1d",
-  "Креатинин_1d",
-  "АЛТ_1d",
-  "АСТ_1d",
-  "Альбумин_1d",
-  "Щелочная_фосфотаза_1d",
-  "Мочевина_1d",
-  "Мочевая_кислота_1d",
-  "ГГТ_1d",
-  "Калий_1d",
-  "Натрий_1d",
-  "АЧТВ_1d",
-  "Хлорид_1d",
-  "МНО_1d",
-  "Фибриноген_1d",
-  "ПВ_1d",
+  "Lactate_1d",
+  "Creatinine_1d",
+  "ALT_1d",
+  "AST_1d",
+  "Albumin_1d",
+  "Alkaline_Phosphatase_1d",
+  "Urea_1d",
+  "Uric_Acid_1d",
+  "GGT_1d",
+  "Potassium_1d",
+  "Sodium_1d",
+  "APTT_1d",
+  "Chloride_1d",
+  "INR_1d",
+  "Fibrinogen_1d",
+  "PT_1d",
   "oneday_log",
-  "8ohdg 1d log",
-  "ИВЛ_д"
-  
+  "8ohdg_1d_log",
+  "Ventilation_d"
 )
 
+data <- data %>%
+  rename(
+    Charlson_Comorbidity_Index_1d = `Индекс_коморбидности_Чарлсона_1d`,
+    CGS_Score = `CGS_балл`,
+    Age = `Возраст`,
+    FOUR_1d = `FOUR_1d`,
+    SOFA_1d = `SOFA_1d`,
+    WBC_1d = `WBC_1d`,
+    `NEU_#_1d` = `NEU_#_1d`,
+    `LYM_#_1d` = `LYM_#_1d`,
+    PLT_1d = `PLT_1d`,
+    Lactate_1d = `Лактат_1d`,
+    Creatinine_1d = `Креатинин_1d`,
+    ALT_1d = `АЛТ_1d`,
+    AST_1d = `АСТ_1d`,
+    Albumin_1d = `Альбумин_1d`,
+    Alkaline_Phosphatase_1d = `Щелочная_фосфотаза_1d`,
+    Urea_1d = `Мочевина_1d`,
+    Uric_Acid_1d = `Мочевая_кислота_1d`,
+    GGT_1d = `ГГТ_1d`,
+    Potassium_1d = `Калий_1d`,
+    Sodium_1d = `Натрий_1d`,
+    APTT_1d = `АЧТВ_1d`,
+    Chloride_1d = `Хлорид_1d`,
+    INR_1d = `МНО_1d`,
+    Fibrinogen_1d = `Фибриноген_1d`,
+    PT_1d = `ПВ_1d`,
+    oneday_log = `oneday_log`,
+    `8ohdg_1d_log` = `8ohdg 1d log`,
+    Ventilation_d = `ИВЛ_д`
+  )
 
-data_filtered <- data %>% select(all_of(target_columns))
+data_filtered <- data %>% select(all_of(target_columns_renamed))
 
 names(data_filtered)
 data_subset_numeric <- data_filtered %>%
@@ -717,90 +746,89 @@ ggplot(correlation_matrix_melted, aes(Var1, Var2, fill = value)) +
     axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),  
     axis.text.y = element_text(color = "black")  
   ) +
-  labs(title = "Матрица корреляций", x = "Переменные", y = "Переменные") -> corr_plot
+  labs(title = "Correlation matrix", x = "Variables", y = "Variables") -> corr_plot
 
-#ggsave("C:/Users/enami/Downloads/correlation_matrix.png", plot = corr_plot, width = 10, #height = 8, bg = "white")
+corrplot(correlation_matrix, type = "upper", order = "hclust",
+         col = brewer.pal(n = 8, name = "RdYlBu"))
 
-#data_filtered_num <- data %>%
-# mutate(across(c("Возраст", "SOFA_1d", "Индекс_коморбидности_Чарлсона_1d", 
-#                "CGS_балл", "oneday_log", "8ohdg 1d log"), as.numeric))
+```
 
-data$Исход <- as.numeric(data$Исход)
-#drop_na(data)
-data <- data[data$Исход %in% c(0, 1), ]
-table(data$Исход)
-str(data$Возраст)
+
+Logistic regression for outcome and clinical scales
+
+```{r}
+data <- data %>% 
+  rename(Outcome = `Исход` )
+data$Outcome <- as.numeric(data$Outcome)
+data %>%
+  mutate(across(`Outcome`, function(x) x %>% factor(levels = c("0", "1"))))
+data <- data %>%
+  mutate(across(`Outcome`, as.factor))
 data$SOFA_1d <- as.numeric(data$SOFA_1d)
-data$Индекс_коморбидности_Чарлсона_1d <-as.numeric(data$Индекс_коморбидности_Чарлсона_1d)
-data$CGS_балл<-as.numeric(data$CGS_балл)
+data$Charlson_Comorbidity_Index_1d <-as.numeric(data$Charlson_Comorbidity_Index_1d)
+data$CGS_Score<-as.numeric(data$CGS_Score)
 data$oneday_log <-as.numeric(data$oneday_log)
-data$`8ohdg 1d log` <-as.numeric(data$`8ohdg 1d log`)
-data$Возраст <- as.numeric(data$Возраст)
-model <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-               CGS_балл + oneday_log + `8ohdg 1d log`, 
+data$`8ohdg_1d_log`<-as.numeric(data$`8ohdg_1d_log`)
+data$Age <- as.numeric(data$Age)
+model <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+               CGS_Score + oneday_log + `8ohdg_1d_log`, 
              data = data, 
              family = binomial)
 summary(model)
-######LR ratio
-data_clean <- na.omit(data[, c("Исход", "Возраст", "SOFA_1d", 
-                               "Индекс_коморбидности_Чарлсона_1d", 
-                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
+coef(model)
+model %>% tidy(exponentiate = TRUE, conf.int = TRUE)
+model %>% glance()
 
-model_full <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                  CGS_балл + oneday_log + `8ohdg 1d log`, 
+rename_labels <- c(
+  "Age" = "Age",
+  "SOFA_1d" = "SOFA Score (1st Day)",
+  "Charlson_Comorbidity_Index_1d" = "Charlson Comorbidity Index (1st Day)",
+  "CGS_Score" = "CGS Score",
+  "oneday_log" = "Extracellular DNA",
+  "8ohdg_1d_log" = " DNA (Deoxyguanosine)"
+)
+
+# Generate the plot
+p <- plot_model(model, 
+                sort.est = TRUE, 
+                show.values = TRUE, 
+                show.p = TRUE, 
+                ci.lvl = 0.95, 
+                title = "Clinical Scales, Extracellular DNA, and Outcome",
+                axis.labels = rev(rename_labels))
+p
+data_clean <- data %>% drop_na(Age, SOFA_1d, Charlson_Comorbidity_Index_1d, 
+                               CGS_Score, oneday_log, `8ohdg_1d_log`, Outcome)
+
+model_full <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+                    CGS_Score + oneday_log + `8ohdg_1d_log`, 
                   data = data_clean, 
                   family = binomial)
-model_reduced <- glm(Исход ~ Возраст, 
+model_reduced <- glm(Outcome ~ Age, 
                      data = data_clean, 
                      family = binomial)
 lrt_result <- anova(model_reduced, model_full, test = "Chi")
 print(lrt_result)
 
+```
+Logistic regression, interactions and centering
 
-library(car)
-vif(model)
-vif_results <- vif(model)
-vif_results_df <- as.data.frame(vif_results)
-vif_results_df$Variables <- rownames(vif_results_df)
-
-summary(model)
-logistic_results <- as.data.frame(summary(model)$coefficients)
-logistic_results$Variables <- rownames(logistic_results)
-
-###we should add OR and CI to report results #https://www.statology.org/how-to-report-logistic-regression-results/
-logistic_results$OR <- exp(logistic_results$Estimate)
-logistic_results$CI_lower <- exp(logistic_results$Estimate - 1.96 * logistic_results$`Std. Error`)
-logistic_results$CI_upper <- exp(logistic_results$Estimate + 1.96 * logistic_results$`Std. Error`)
-
-#install.packages("performance")
-library(performance)
-model_check <-check_model(model)
-model_check
-#ggsave("C:/Users/enami/Downloads/model_diagnostics_plot.png", plot = model_check)
-#png("C:/Users/enami/Downloads/combined_model_diagnostics.png", width = 1200, height = 800)
-#plot(model_check)  # Рисуем графики
-#dev.off()
-library(dagitty)
-
-#####DAG ANALYSIS
-
-#install.packages("ggdag")
-#install.packages("dagitty")
+```{r}
 library(ggdag)
 library(dagitty)
 dag <- dagitty("dag {
   Outcome <- Age
-  Outcome <- SOFA_1d
-  Outcome <- Charlson_Index_1d
-  Outcome <- CGS_Score
-  Outcome <- oneday_log
-  Outcome <- 8hdg_1d_log
+  Outcome <- SOFA1d
+  Outcome <- Charlson1d
+  Outcome <- CGS Score
+  Outcome <- ecDNA
+  Outcome <- ecDNA_other
   
-  Age -> SOFA_1d
-  Age -> Charlson_Index_1d
-  Age -> CGS_Score
-  Charlson_Index_1d -> CGS_Score
-  Charlson_Index_1d -> SOFA_1d
+  Age -> SOFA1d
+  Age -> Charlson1d
+  Age -> CGS Score
+  Charlson1d -> CGS Score
+  Charlson1d -> SOFA1d
   
 }")
 
@@ -815,150 +843,419 @@ dag_plot <- ggdag(dag) +
     legend.position = "none"
   ) +
   coord_fixed(ratio = 1.5)  
-
-#ggsave("C:/Users/enami/Downloads/dag_plot.png", plot = dag_plot, width = 10, height = 8, #bg = "white")
-
-model_dag <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                   CGS_балл + oneday_log + `8ohdg 1d log` +
-                   Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                   Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
+model_dag <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+                   CGS_Score + oneday_log + `8ohdg_1d_log` +
+                   Age:SOFA_1d + Age:Charlson_Comorbidity_Index_1d +
+                   Age:CGS_Score + Charlson_Comorbidity_Index_1d:SOFA_1d + Charlson_Comorbidity_Index_1d:CGS_Score, 
                  data = data, 
                  family = binomial)
-model_dag
-
-library(car)
+summary(model_dag)
+coef(model_dag)
+model_dag %>% tidy(exponentiate = TRUE, conf.int = TRUE)
 vif_results_dag <- vif(model_dag)
-vif_results_df_dag <- as.data.frame(vif_results_dag)
-vif_results_df_dag$Variables <- rownames(vif_results_df_dag)
-logistic_results_dag <- as.data.frame(summary(model_dag)$coefficients)
-logistic_results_dag$Variables <- rownames(logistic_results_dag)
 
-library(performance)
-model_check_dag <- check_model(model_dag)
-model_check_dag
-
-#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot.png", width = 1200, height = 800)
-#plot(model_check)  
-#dev.off()
-
-
-library(ggdag)
-
-
-list(
-  VIF = vif_results_df_dag,
-  Summary = logistic_results_dag,
-  Diagnostics = model_check_dag
-)
-
-#####попробую вот эту штуку центрирование – вычитание собственной средней из всех ##интервальных предикторов; приводит к осмысленному значению константы
 data_center <- data
 
-data_center$Возраст <- scale(data$Возраст, center = TRUE, scale = FALSE)
+data_center$Age <- scale(data$Age, center = TRUE, scale = FALSE)
 data_center$SOFA_1d <- scale(data$SOFA_1d, center = TRUE, scale = FALSE)
-data_center$Индекс_коморбидности_Чарлсона_1d <- scale(data$Индекс_коморбидности_Чарлсона_1d, center = TRUE, scale = FALSE)
-data_center$CGS_балл <- scale(data$CGS_балл, center = TRUE, scale = FALSE)
+data_center$Charlson_Comorbidity_Index_1d <- scale(data$Charlson_Comorbidity_Index_1d, center = TRUE, scale = FALSE)
+data_center$CGS_Score <- scale(data$CGS_Score, center = TRUE, scale = FALSE)
 data_center$oneday_log <- scale(data$oneday_log, center = TRUE, scale = FALSE)
-data_center$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = FALSE)
+data_center$`8ohdg_1d_log` <- scale(data$`8ohdg_1d_log`, center = TRUE, scale = FALSE)
 
 
 
-model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                        CGS_балл + oneday_log + `8ohdg 1d log` +
-                        Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                        Возраст:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Индекс_коморбидности_Чарлсона_1d:CGS_балл, 
+model_dagcentr <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+                        CGS_Score + oneday_log + `8ohdg_1d_log` +
+                        Age:SOFA_1d + Age:Charlson_Comorbidity_Index_1d +
+                        Age:CGS_Score + Charlson_Comorbidity_Index_1d:SOFA_1d + Charlson_Comorbidity_Index_1d:CGS_Score, 
                       data = data_center, 
                       family = binomial)
-vif_results_dagcentr <- vif(model_dagcentr)
-vif_results_df_dagcentr <- as.data.frame(vif_results_dagcentr)
-vif_results_df_dagcentr$Variables <- rownames(vif_results_df_dagcentr)
-vif_results_dagcentr #####круто центрирование сработало
-logistic_results_dagcentr <- as.data.frame(summary(model_dagcentr)$coefficients)
-logistic_results_dagcentr$Variables <- rownames(logistic_results_dagcentr)
-logistic_results_dagcentr$OR <- exp(logistic_results_dagcentr$Estimate)
-logistic_results_dagcentr$CI_lower <- exp(logistic_results_dagcentr$Estimate - 1.96 * logistic_results_dagcentr$`Std. Error`)
-logistic_results_dagcentr$CI_upper <- exp(logistic_results_dagcentr$Estimate + 1.96 * logistic_results_dagcentr$`Std. Error`)
 
-model_check_dagcentr <- check_model(model_dagcentr)
-model_check_dagcentr
-
-#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot_scale.png", width = 1200, height #= 800)
-#plot(model_check_dagcentr)  
-#dev.off()
-list(
-  VIF = vif_results_df_dagcentr,
-  Summary = logistic_results_dagcentr,
-  Diagnostica = model_check_dagcentr
+summary(model_dagcentr)
+coef(model_dagcentr)
+model_dagcentr %>% tidy(exponentiate = TRUE, conf.int = TRUE)
+rename_labels <- c(
+  "Age" = "Age",
+  "SOFA_1d" = "SOFA Score (1st Day)",
+  "Charlson_Comorbidity_Index_1d" = "Charlson Comorbidity Index (1st Day)",
+  "CGS_Score" = "CGS Score",
+  "oneday_log" = "Extracellular DNA",
+  "8ohdg_1d_log" = "DNA deoxyguanosine",
+  "Age:SOFA_1d" = "Age × SOFA Score (1st Day)",
+  "Age:Charlson_Comorbidity_Index_1d" = "Age × Charlson Comorbidity Index (1st Day)",
+  "Age:CGS_Score" = "Age × CGS Score",
+  "Charlson_Comorbidity_Index_1d:SOFA_1d" = "Charlson Comorbidity Index (1st Day) × SOFA Score (1st Day)",
+  "Charlson_Comorbidity_Index_1d:CGS_Score" = "Charlson Comorbidity Index (1st Day) × CGS Score"
 )
 
-#####lets do the lrt again
-data_clean_center <- na.omit(data_center[, c("Исход", "Возраст", "SOFA_1d", 
-                               "Индекс_коморбидности_Чарлсона_1d", 
-                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
-model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                      CGS_балл + oneday_log + `8ohdg 1d log`, 
-                    data = data_clean_center, 
-                    family = binomial)
+# Generate the plot with new model
+p2 <- plot_model(model_dagcentr, 
+                sort.est = TRUE, 
+                show.values = TRUE, 
+                show.p = TRUE, 
+                ci.lvl = 0.95, 
+                title = "Clinical Scales, Extracellular DNA, Interaction Effects, and Outcome",
+                axis.labels = rev(rename_labels))  
 
-model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                    CGS_балл + oneday_log + `8ohdg 1d log` +
-                    Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                    Индекс_коморбидности_Чарлсона_1d:CGS_балл + Индекс_коморбидности_Чарлсона_1d:SOFA_1d + Возраст:CGS_балл,
-                  data = data_clean_center, 
-                  family = binomial)
+p2
+
+data_clean_center <- na.omit(data_center[, c("Outcome", "Age", "SOFA_1d", 
+                                             "Charlson_Comorbidity_Index_1d", 
+                                             "CGS_Score", "oneday_log", "8ohdg_1d_log")])
+model_reduced_combo <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+                             CGS_Score + oneday_log + `8ohdg_1d_log`, 
+                           data = data_clean_center, 
+                           family = binomial)
+
+model_full_combo <- glm(Outcome ~ Age + SOFA_1d + Charlson_Comorbidity_Index_1d + 
+                          CGS_Score + oneday_log + `8ohdg_1d_log` +
+                          Age:SOFA_1d + Age:Charlson_Comorbidity_Index_1d +
+                          Charlson_Comorbidity_Index_1d:CGS_Score + Charlson_Comorbidity_Index_1d:SOFA_1d + Age:CGS_Score,
+                        data = data_clean_center, 
+                        family = binomial)
 
 lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
 
 print(lrt_result_combo)
 
-######stepwise regression and knn stuff
+```
+
+Boruta algorithm, KNN imputation and logistic regression for Outcome
+
+```{r}
 library(tidymodels)
 library(recipes)
 library(MASS)
-data_for_regres2 <- data[, c( "Пол", "Возраст",   "Пневмония", 
-                             "Инфекция",  "CGS_балл", "Индекс_коморбидности_Чарлсона_1d", 
-                             "CIRS-G_сумма_1d", "CIRS-G_систем_с_паталогиями_5d_36", 
-                             "CIRS-G_индекс_тяжести_1d", "FOUR_1d", "SOFA_1d", 
-                             "WBC_1d", "NEU_#_1d",  "LYM_#_1d", 
-                              "PLT_1d", "Лактат_1d", "Креатинин_1d", "АЛТ_1d", 
-                             "АСТ_1d", "Альбумин_1d", "Щелочная_фосфотаза_1d", "Мочевая_кислота_1d", 
-                             "Мочевина_1d", "ГГТ_1d", "Калий_1d", "Натрий_1d", "Хлорид_1d", 
-                             "АЧТВ_1d", "МНО_1d", "Фибриноген_1d", "ПВ_1d", "Уросептическая_инфекция", 
-                             "Сепсис/септический_шок", "Потребность_ИВЛ",  
-                             "ИВЛ_д",  "Койко-дни_ФНКЦРР", "Исход", 
-                             "Пневмония_возникшая_ФНКЦРР", "oneday_log", "8ohdg 1d log")]
+library(knitr)
+library(tidyverse)
+library(broom)
+library(naniar)
+library(simputation)
+library(VIM)
+library(Boruta)
+library(recipes)
+data <- data %>% 
+  rename(
+    CIRS_G_Sum_1d = `CIRS-G_сумма_1d`, 
+    CIRS_G_Severity_Index_1d = `CIRS-G_индекс_тяжести_1d`, 
+    Pneumonia = Пневмония, 
+    Sex = Пол, 
+    FSCCRR_bed_days = `Койко-дни_ФНКЦРР`,
+  )
+data<- data %>%
+  rename(
+    Sepsis_Septicshock = `Сепсис/септический_шок`,
+    Uroseptic_infection = `Уросептическая_инфекция`,
+    Infection = `Инфекция`
+  )
+
+data_for_regres2 <- data[, c("Sex", "Age", "Pneumonia", 
+                             "Infection", "CGS_Score", "Charlson_Comorbidity_Index_1d", 
+                             "CIRS_G_Sum_1d", "CIRS_G_Severity_Index_1d", "FOUR_1d", "SOFA_1d", 
+                             "WBC_1d", "NEU_#_1d", "LYM_#_1d", "PLT_1d", "Lactate_1d", "Creatinine_1d", 
+                             "ALT_1d", "AST_1d", "Albumin_1d", "Alkaline_Phosphatase_1d", "Uric_Acid_1d", 
+                             "Urea_1d", "GGT_1d", "Potassium_1d", "Sodium_1d", "Chloride_1d", 
+                             "APTT_1d",  "Fibrinogen_1d",  "Uroseptic_infection", 
+                             "Sepsis_Septicshock",  "Ventilation_d", "FSCCRR_bed_days", 
+                             "Outcome", "oneday_log", "8ohdg_1d_log")]
+data_for_regres2$Sex <- toupper(data_for_regres2$Sex)
+data_for_regres2$Sex <- ifelse(data_for_regres2$Sex == "М", "M", 
+                               ifelse(data_for_regres2$Sex == "Ж", "F", data_for_regres2$Sex))
+
+data_for_regres2 %>%
+  mutate(across(`Sex`, function(x) x %>% factor(levels = c("M", "F"))))
+
+data_for_regres2 %>%
+  mutate(across(`Infection`, function(x) x %>% factor(levels = c("0", "1"))))
+data_for_regres2 %>%
+  mutate(across(`Pneumonia`, function(x) x %>% factor(levels = c("0", "1"))))
 
 data_for_regres2 <- data_for_regres2 %>%
-  mutate(
-    Пол = ifelse(Пол == "м", 1, 2),  # м -> 1, ж -> 2
-    Пневмония = ifelse(Пневмония == "есть", 1, 2),  
-    Инфекция = ifelse(Инфекция == "есть", 1, 2)
-  )
-data_for_regres2[] <- lapply(data_for_regres2, function(x) {
-  if (!is.numeric(x)) as.numeric(as.character(x)) else x
-})
-rec <- recipe(Исход ~ ., data = data_for_regres2) %>%
-  step_impute_knn(all_predictors(), neighbors = 5)
+  mutate(`Sepsis_Septicshock` = ifelse(`Sepsis_Septicshock` %in% c("0", "1"), 
+                                       `Sepsis_Septicshock`, 
+                                       NA))
+data_for_regres2 %>%
+  mutate(across(`Sepsis_Septicshock`, function(x) x %>% factor(levels = c("0", "1"))))
+data_for_regres2 %>%
+  mutate(across(`Uroseptic_infection`, function(x) x %>% factor(levels = c("0", "1"))))
+data_for_regres2 %>%
+  mutate(across(`Outcome`, function(x) x %>% factor(levels = c("0", "1"))))
 
-rec_prep <- prep(rec)
-data_imputed <- bake(rec_prep, new_data = NULL)
-sum(is.na(data_for_regres2))  
-sum(is.na(data_imputed))      
-model_glm <- glm(Исход ~ ., data = data_imputed, family = binomial)
-stepwise_model_glm <- stepAIC(model_glm, direction = "both", trace = TRUE)
-summary(stepwise_model_glm)
-summary(stepwise_model_glm)
+data_for_regres2 <- data_for_regres2 %>%
+  mutate(across(c(`Sex`, `Infection`, `Pneumonia`, `Sepsis_Septicshock`, 
+                  `Uroseptic_infection`, `Outcome`), as.factor))
 
 
-summary(stepwise_model_glm)
-vif(stepwise_model_glm)
+numeric_columns <- c("Age", "CGS_Score", "Charlson_Comorbidity_Index_1d",
+                     "CIRS_G_Sum_1d", 
+                     "CIRS_G_Severity_Index_1d", "FOUR_1d", "SOFA_1d", 
+                     "WBC_1d", "NEU_#_1d", "LYM_#_1d", "PLT_1d", 
+                     "Lactate_1d", "Creatinine_1d", "ALT_1d", "AST_1d", 
+                     "Albumin_1d", "Alkaline_Phosphatase_1d", "Uric_Acid_1d", 
+                     "Urea_1d", "GGT_1d", "Potassium_1d", "Sodium_1d", 
+                     "Chloride_1d", "APTT_1d","Fibrinogen_1d", 
+                     "Ventilation_d", "FSCCRR_bed_days", 
+                     "oneday_log", "8ohdg_1d_log")
 
 
+data_for_regres2[numeric_columns] <- lapply(data_for_regres2[numeric_columns], as.numeric)
+
+skimr::skim(data_for_regres2)
+
+
+missing_proportion <- colSums(is.na(data_for_regres2)) / nrow(data_for_regres2)
+
+
+cols_to_remove <- names(missing_proportion[missing_proportion > 0.5])
+
+
+data_for_regres3 <- data_for_regres2[, !(names(data_for_regres2) %in% cols_to_remove)]
+
+recipe_obj <- recipe(Outcome ~ ., data = data_for_regres3) %>%
+  step_impute_knn(all_predictors(), neighbors = 5) %>%
+  prep(training = data_for_regres3)
+
+
+data_for_regres_imputed <- bake(recipe_obj, new_data = data_for_regres3)
+str(data_for_regres3)
+
+data_for_regres3 %>% glimpse()
+
+data_for_regres_imputed$Infection <- as.character(data_for_regres_imputed$Infection)
+
+
+data_for_regres_imputed$Infection[!(data_for_regres_imputed$Infection %in% c("1", "0"))] <- "1"
+
+table(data_for_regres_imputed$Infection)
+
+data_clean <- data_for_regres_imputed[!is.na(data_for_regres_imputed$Outcome), ]
+num_rows_left <- nrow(data_clean)
+print(num_rows_left)
+boruta_result <- Boruta(Outcome ~ ., data = data_clean, doTrace = 2)
+print(boruta_result)
+final_features <- getSelectedAttributes(boruta_result, withTentative = TRUE)
+print(final_features)
+data_selected <- data_clean[, c(final_features, "Outcome")]
+model_glm_boruta <- glm(Outcome ~ ., data = data_selected, family = binomial)
+summary(model_glm_boruta)
+
+tidy_stepwise <- tidy(model_glm_boruta, exponentiate = TRUE, conf.int = TRUE)
+glance_results <- glance(model_glm_boruta)
+
+rename_labels_new <- c(
+  "Sex" = "Sex",
+  "CGS_Score" = "CGS Score",
+  "Charlson_Comorbidity_Index_1d" = "Charlson Comorbidity Index (1st Day)",
+  "AST_1d" = "AST (1st Day)",
+  "Sodium_1d" = "Sodium (1st Day)",
+  "Uroseptic_infection" = "Uroseptic Infection",
+  "Sepsis_Septicshock" = "Sepsis & Septic Shock",
+  "Ventilation_d" = "Ventilation (Days)",
+  "FSCCRR_bed_days" = "FSCCRR Bed Days",
+  "oneday_log" = "Extracellular DNA",
+  "SexM" = "Male Sex",  
+  "Infection1" = "Infection present",  
+  "FOUR_1d" = "FOUR Score (1st Day)",  
+  "Sodium_1d" = "Sodium (1st Day)",  
+  "Uroseptic_infection1" = "Uroseptic Infection",  
+  "Sepsis_Septicshock1" = "Sepsis & Septic Shock",  
+  "Ventilation_d" = "Ventilation (Days)",  
+  "FSCCRR_bed_days" = "FSCCRR Bed Days",
+  "8ohdg_1d_log" = "DNa deoxyguanosine",
+  "WBC_1d" = "WBC (1st Day)",  
+  "NEU_#_1d" = "Neutrophils (1st Day)",  
+  "LYM_#_1d" = "Lymphocytes (1st Day)",  
+  "PLT_1d" = "Platelets (1st Day)",  
+  "Lactate_1d" = "Lactate (1st Day)",  
+  "Creatinine_1d" = "Creatinine (1st Day)",  
+  "ALT_1d" = "ALT (1st Day)", 
+  "Albumin_1d" = "Albumin (1st Day)",  
+  "Alkaline_Phosphatase_1d" = "Alkaline Phosphatase (1st Day)",  
+  "Uric_Acid_1d" = "Uric Acid (1st Day)", 
+  "Urea_1d" = "Urea (1st Day)", 
+  "GGT_1d" = "GGT (1st Day)",  
+  "Potassium_1d" = "Potassium (1st Day)",
+  "Pneumonia1" = "Pneumonia",
+  "Fibrinogen_1d" = "Fibrinogen (1st Day)",
+  "Chloride_1d" = "Chloride (1st Day)",
+  "SOFA_1d" = "SOFA (1st Day)",
+  "CIRS_G_Sum_1d" ="CIRSG Sum (1st Day)", 
+  "CIRS_G_Severity_Index_1d" = "CIRSG Severity (1st Day)"
+  
+  # FSCCRR_bed_days
+)
+
+p_new <- plot_model(model_glm_boruta, 
+                    sort.est = TRUE, 
+                    show.values = TRUE, 
+                    show.p = TRUE, 
+                    ci.lvl = 0.95, 
+                    title = "Logistic regression results",
+                    axis.labels = rev(rename_labels_new),
+                    value.offset = 0.5)
 ```
+
+Boruta algorithm, KNN imputation and logistic regression for Ventilation need
 
 ```{r}
+library(sjPlot)
+library(Boruta)
+library(MASS)
+colnames(data)
+data1 <- data[data$Outcome == 0, ]
+data1 <- data1 %>% rename(Ventilation_Need = Потребность_ИВЛ)
 
+
+
+data_for_regres4 <- data1[, c("Sex", "Age", "Pneumonia", 
+                              "Infection", "CGS_Score", "Charlson_Comorbidity_Index_1d", 
+                              "CIRS_G_Sum_1d", "CIRS_G_Severity_Index_1d", "FOUR_1d", "SOFA_1d", 
+                              "WBC_1d", "NEU_#_1d", "LYM_#_1d", "PLT_1d", "Lactate_1d", "Creatinine_1d", 
+                              "ALT_1d", "AST_1d", "Albumin_1d", "Alkaline_Phosphatase_1d", "Uric_Acid_1d", 
+                              "Urea_1d", "GGT_1d", "Potassium_1d", "Sodium_1d", "Chloride_1d", 
+                              "APTT_1d",  "Fibrinogen_1d",  "Uroseptic_infection", 
+                              "FSCCRR_bed_days", 
+                              "oneday_log", "8ohdg_1d_log", "Ventilation_Need")]
+data_for_regres4$Sex <- toupper(data_for_regres4$Sex)
+data_for_regres4$Sex <- ifelse(data_for_regres4$Sex == "М", "M", 
+                               ifelse(data_for_regres4$Sex == "Ж", "F", data_for_regres4$Sex))
+
+data_for_regres4 %>%
+  mutate(across(`Ventilation_Need`, function(x) x %>% factor(levels = c("0", "1"))))
+data_for_regres4 %>%
+  mutate(across(`Sex`, function(x) x %>% factor(levels = c("M", "F"))))
+
+data_for_regres4 %>%
+  mutate(across(`Infection`, function(x) x %>% factor(levels = c("0", "1"))))
+data_for_regres4 %>%
+  mutate(across(`Pneumonia`, function(x) x %>% factor(levels = c("0", "1"))))
+
+
+data_for_regres4 %>%
+  mutate(across(`Uroseptic_infection`, function(x) x %>% factor(levels = c("0", "1"))))
+
+
+data_for_regres4 <- data_for_regres4 %>%
+  mutate(across(c(`Sex`, `Infection`, `Pneumonia`,  
+                  `Uroseptic_infection`,`Ventilation_Need` ), as.factor))
+numeric_columns <- c("Age", "CGS_Score", "Charlson_Comorbidity_Index_1d",
+                     "CIRS_G_Sum_1d", 
+                     "CIRS_G_Severity_Index_1d", "FOUR_1d", "SOFA_1d", 
+                     "WBC_1d", "NEU_#_1d", "LYM_#_1d", "PLT_1d", 
+                     "Lactate_1d", "Creatinine_1d", "ALT_1d", "AST_1d", 
+                     "Albumin_1d", "Alkaline_Phosphatase_1d", "Uric_Acid_1d", 
+                     "Urea_1d", "GGT_1d", "Potassium_1d", "Sodium_1d", 
+                     "Chloride_1d", "APTT_1d","Fibrinogen_1d", 
+                     "FSCCRR_bed_days", 
+                     "oneday_log", "8ohdg_1d_log")
+
+
+data_for_regres4[numeric_columns] <- lapply(data_for_regres4[numeric_columns], as.numeric)
+
+skimr::skim(data_for_regres4)
+
+
+
+missing_proportion <- colSums(is.na(data_for_regres4)) / nrow(data_for_regres4)
+
+
+cols_to_remove <- names(missing_proportion[missing_proportion > 0.5])
+
+
+data_for_regres5 <- data_for_regres4[, !(names(data_for_regres4) %in% cols_to_remove)]
+
+
+#data_imputed <- kNN(data_for_regres3, k = 5)
+library(recipes)
+recipe_obj <- recipe(Ventilation_Need ~ ., data = data_for_regres5) %>%
+  step_impute_knn(all_predictors(), neighbors = 5) %>%
+  prep(training = data_for_regres5)
+
+
+data_for_regres_imputed2 <- bake(recipe_obj, new_data = data_for_regres5)
+str(data_for_regres5)
+
+data_for_regres5 %>% glimpse()
+data_for_regres_imputed2$Infection <- ifelse(data_for_regres_imputed2$Infection %in% 
+                                               c("интерстициальный цистит", 
+                                                 "полисегментарная пневмония справа, ст. разрешения", 
+                                                 "полисегментарная правосторонняя пневмония"), 
+                                             1, 
+                                             data_for_regres_imputed2$Infection)
+
+
+
+data_clean <- data_for_regres_imputed2[!is.na(data_for_regres_imputed2$Ventilation_Need), ]
+
+boruta_result <- Boruta(Ventilation_Need ~ ., data = data_clean, doTrace = 2)
+print(boruta_result)
+final_features <- getSelectedAttributes(boruta_result, withTentative = FALSE)
+print(final_features)
+data_selected <- data_clean[, c(final_features, "Ventilation_Need")]
+model_glm_boruta <- glm(Ventilation_Need ~ ., data = data_selected, family = binomial)
+summary(model_glm_boruta)
+
+
+rename_labels_new <- c(
+  "Sex" = "Sex",
+  "CGS_Score" = "CGS Score",
+  "Charlson_Comorbidity_Index_1d" = "Charlson Comorbidity Index (1st Day)",
+  "AST_1d" = "AST (1st Day)",
+  "Sodium_1d" = "Sodium (1st Day)",
+  "Uroseptic_infection" = "Uroseptic Infection",
+  "Sepsis_Septicshock" = "Sepsis & Septic Shock",
+  "Ventilation_d" = "Ventilation (Days)",
+  "FSCCRR_bed_days" = "FSCCRR Bed Days",
+  "oneday_log" = "Extracellular DNA",
+  "SexM" = "Male Sex",  # SexM
+  "Infection1" = "Infection present",  # Infection1
+  "FOUR_1d" = "FOUR Score (1st Day)",  # FOUR_1d
+  "Sodium_1d" = "Sodium (1st Day)",  
+  "Uroseptic_infection1" = "Uroseptic Infection",  # Uroseptic_infection1
+  "Sepsis_Septicshock1" = "Sepsis & Septic Shock",  # Sepsis_Septicshock1
+  "Ventilation_d" = "Ventilation (Days)",  # Ventilation_d
+  "FSCCRR_bed_days" = "FSCCRR Bed Days",
+  "8ohdg_1d_log" = "DNA deoxyguanosine",
+  "WBC_1d" = "WBC (1st Day)",  
+  "NEU_#_1d" = "Neutrophils (1st Day)",  
+  "LYM_#_1d" = "Lymphocytes (1st Day)",  
+  "PLT_1d" = "Platelets (1st Day)",  
+  "Lactate_1d" = "Lactate (1st Day)",  
+  "Creatinine_1d" = "Creatinine (1st Day)", 
+  "ALT_1d" = "ALT (1st Day)",  
+  "Albumin_1d" = "Albumin (1st Day)",  
+  "Alkaline_Phosphatase_1d" = "Alkaline Phosphatase (1st Day)",  
+  "Uric_Acid_1d" = "Uric Acid (1st Day)",  
+  "Urea_1d" = "Urea (1st Day)", 
+  "GGT_1d" = "GGT (1st Day)",  
+  "Potassium_1d" = "Potassium (1st Day)",
+  "Pneumonia1" = "Pneumonia",
+  "Fibrinogen_1d" = "Fibrinogen (1st Day)",
+  "Chloride_1d" = "Chloride (1st Day)",
+  "SOFA_1d" = "SOFA (1st Day)",
+  "CIRS_G_Sum_1d" ="CIRSG Sum (1st Day)", 
+  "CIRS_G_Severity_Index_1d" = "CIRSG Severity (1st Day)"
+  
+  # FSCCRR_bed_days
+)
+
+
+p_new <- plot_model(model_glm_boruta, 
+                    sort.est = TRUE, 
+                    show.values = TRUE, 
+                    show.p = TRUE, 
+                    ci.lvl = 0.95, 
+                    title = "Logistic regression results",
+                    axis.labels = rev(rename_labels_new),
+                    value.offset = 0.5)  # Ensure correct order
+p_new
+check_model(model_glm_boruta, type = "discrete_dots")
 ```
+
+
+
+
 
 ### Лена унивариантный регрессия для всех переменных:
 
