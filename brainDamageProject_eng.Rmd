@@ -9,23 +9,34 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library (tidyverse)
-library (readxl)
-library(lubridate)
+
+library(performance)
 library(tidycmprsk)
+library(factoextra)
+library(FactoMineR)
+library(gtsummary)
 library(ggsurvfit)
-library(anytime)
+library(tidyverse)
+library(lubridate)
+library(StatMatch)
+library(ggbiplot)
+library(openxlsx)
 library(SNPassoc)
+library(reshape2)
+library(cluster)
+library(anytime)
+library(ggplot2)
+library(dagitty)
+library(readxl)
+library(plotly)
+library(stats)
+library(ggdag)
+library(broom)
 library(aod)
+library(car)
 ```
 
 ## Dataset preparation
-
-ДЛЯ ДАТЫ МОЗГОВОЙ КАТАСТРОФЫ для пациента 2 пацентов указан только год
-для пациента (170 строка) указан год и дата через дробь??? 9 пропущенных
-значений NA
-
-ДЛЯ ДАТЫ ПЕРЕВОДА В ФНКРР для пациента 21 опечатка 6 NA
 
 Read dataset and check for errors in date variables
 
@@ -131,7 +142,7 @@ data_e <- data
  List of primary variables (according to medical basis) : 
   Номер, ID,  Пол, HTR1A_rs6295, AQP4_rs1058427 , BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP_rs3736309, Возраст, анти-HCV, Hbs_AG,  ЛСМА, Основной_диагноз_код_МКБ10, Диагноз, Пневмония, Инфекция, CGS_балл, Индекс_коморбидности_Чарлсона_1d, CIRS-G_сумма_1d, CIRS-G_систем_с_паталогиями_1, CIRS-G_индекс_тяжести_1d, FOUR_1d, SOFA_1d, внкДНК_1d, 8ohdg_1d, WBC_1d,  NEU_#_1d, NEU_%_1d, LYM_#_1d, LYM_%_1d,  PLT_1d, Лактат_1d, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, Сепсис/септический_шок, Потребность_ИВЛ, Ухудшение_пневмонии_сутки, ИВЛ_д, Дни_ОРИТ_ФНКЦРР, Койко-дни_ФНКЦРР, Исход, Пневмония_возникшая_ФНКЦРР 
 
-#### ENGLISH RENAME
+#### ENGLISH NAMING
 
 ```{r}
 data_e <- data_e %>% rename ("Num" = "№ истории", "Part" = "Часть", "Sex" = "Пол", "Num_ref" = "Номер Настя", "Age" = "Возраст", "HTR1A_rs6295" = "HTR1A  rs6295","AQP4_rs1058427"  = "AQP4 rs1058427", "BDNF_rs6265" = "BDNF rs6265", "OLR1_rs11053646" = "OLR1 rs11053646", "NRF2_rs6726395" = "NRF2 rs6726395", "AGTR1_rs275651" = "AGTR1  rs275651",  "AQP5_rs3759129" = "AQP5 rs3759129", "TLR9_rs352162" = "TLR9 rs352162", "TLR9_rs187084" = "TLR 9 rs187084", "AQP5_rs3736309" = "AQP rs3736309",  "anti-HCV" = "анти HCV 2-нд, 1 - да, 0 - нет", "Hbs_AG" = "Hbs AG 0-не,2-нд, 1 - да", "LMCA" = "ЛСМА", "Date_brain_damage" = "Дата мозговой катастрофы" , "Main_diagnosis_code" = "Основной диагноз код МКБ10", "Diagnosis" = "Диагноз целиком", "Transfer_date_FSCCRR" = "Дата перевода в ФНКРР", "Pneumonia" = "Поступил в ФНКЦ с пневмонией", "Infection"  = "Поступил в ФКНЦ с инфекцией", "T_admission"  = "t° при поступлении", "CGS" = "CGS, балл", "CCI_1d"  = "Индекс коморбидности Чарлсона (баллы) 1d",  "CCI_5d" = "Индекс коморбидности Чарлсона (баллы) 5d",
@@ -156,7 +167,6 @@ data_e <- data_e %>% rename ("Num" = "№ истории", "Part" = "Часть"
 "Uroseptic_infection" = "Уросептическая инфекция в любой момент времени",
 "Sepsis/septic_shock" = "Сепсис/септический шок в любой момент времни",
 "Ventilation" = "Потребность в ИВЛ за время госпитализации в любой момент времени",
-"Ухудшение пневмонии_сутки" = "Ухудшение исходной пневмонии, сутки",
 "Ventilation_d" = "ИВЛ (дни)",
 "Discharge_date_FSCCRR" = "Дата выписки из ФНКЦ РР",
 "ICU_FSCCRR_d" = "Дней в ОРИТ ФНКЦ РР",
@@ -238,7 +248,7 @@ hospital_polymorf_e <- data_e %>%  mutate (`HTR1A_rs6295` = ifelse (`HTR1A_rs629
                                                         .default = `TLR9_rs187084` ),
                               `AQP5_rs3736309` = case_when(`AQP5_rs3736309` == 'C/T' | `AQP5_rs3736309` == 'С/T' ~ 'C/T',
                                                         .default = `AQP5_rs3736309` ))  %>% 
-  select(ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309, `Ventilation`, `Outcome`, `oneday_log`, `8ohdg 1d log`, `NLR_1d` ) %>% 
+  dplyr::select(ID, HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309, `Ventilation`, `Outcome`, `oneday_log`, `8ohdg 1d log`, `NLR_1d` ) %>% 
   mutate (across(c(HTR1A_rs6295, AQP4_rs1058427, BDNF_rs6265, OLR1_rs11053646, NRF2_rs6726395, AGTR1_rs275651, AQP5_rs3759129, TLR9_rs352162, TLR9_rs187084, AQP5_rs3736309), factor)) 
 
 ```
@@ -259,7 +269,6 @@ ggplot (hospital_polymorf_long) +
 **SNP descriptive analysis**
 
 ```{r}
-library(SNPassoc)
 # specify columns contain SNP
 polymorf.s <- setupSNP (data=hospital_polymorf_e, colSNPs=2:11, sep="/")
 # got new class snp
@@ -437,7 +446,7 @@ data_e %>% summarise(
 
 
 ```{r}
-# Классифицируем диагнозы по группам
+# Classify diagnoses by groups
 data_e <- data_e %>% mutate(
   diseaseGroup = case_when(
     `Main_diagnosis_code` %in% c("I63", "I69.3", "I69.4", "T82.8", "I69.3;C34.1", "I63.5", "I63.3", "I63.2", "I63.4", "I63.9") ~ "Ischemic stroke",
@@ -486,40 +495,22 @@ data_e %>%
     panel.grid.minor = element_line(color = "lightgray"),
   )
 ```
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!НАЧИНАЯ ОТСЮДА Я НЕ ИСПРАВЛЯЛА ЧАСТЬ УСТИНА!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 
 ```{r}
-data_no_na_dates <- data %>% filter(!is.na(`Дата_выписки_ФНКЦРР`)) %>% filter(!is.na(`Дата_выписки_ФНКЦРР`))
+data_no_na_dates <- data_e %>% filter(!is.na(Discharge_date_FSCCRR))
 
 forcrmp <- data_no_na_dates %>%
   mutate(
-    time = `Койко-дни_ФНКЦРР` %>% as.numeric(),
+    time = `FSCCRR_bed-days` %>% as.numeric(),
     status = case_when(
-      `Исход` == "0" ~ "Выписка",
-      `Исход` == "1" ~ "Смерть",
-      `Исход` == "2" ~ "Цензура"
+      Outcome == "0" ~ "Выписка",
+      Outcome == "1" ~ "Смерть",
+      Outcome == "2" ~ "Цензура"
     ) %>% factor(levels = c("Цензура", "Смерть", "Выписка"))
   ) %>% 
-  select(time, status, `Уросептическая_инфекция`, diseaseGroup, Исход)
+  select(time, status, Uroseptic_infection, diseaseGroup, Outcome)
 ```
 
-
-## Competing risk regression
-```{r}
-crr_mod <- crr(Surv(time, status) ~ `Уросептическая_инфекция`, forcrmp)
-crr_mod
-```
-
-```{r}
-tbl <- 
-  crr_mod %>%
-  gtsummary::tbl_regression(exponentiate = TRUE) %>%
-  gtsummary::add_global_p() %>%
-  add_n(location = "level")
-```
 ## Cumulative incidence
 ```{r}
 cuminc(Surv(time, status) ~ 1, forcrmp)
@@ -543,6 +534,176 @@ cuminc(Surv(time, status) ~ diseaseGroup, forcrmp) %>%
   ggcuminc(c('Смерть', 'Выписка')) +
   scale_ggsurvfit(x_scales = list(breaks = seq(0, 600, by = 30)))+
   add_risktable()
+```
+
+
+### Cluster analysis
+
+Data preparation
+```{r}
+data <- data_e %>% 
+  mutate(
+    Sex = as.factor(Sex),
+    HTR1A_rs6295 = as.factor(HTR1A_rs6295),
+    AQP4_rs1058427 = as.factor(AQP4_rs1058427),
+    BDNF_rs6265 = as.factor(BDNF_rs6265),
+    OLR1_rs11053646 = as.factor(OLR1_rs11053646),
+    NRF2_rs6726395 = as.factor(NRF2_rs6726395),
+    AGTR1_rs275651 = as.factor(AGTR1_rs275651),
+    AQP5_rs3759129 = as.factor(AQP5_rs3759129),
+    TLR9_rs352162 = as.factor(TLR9_rs352162),
+    AQP5_rs3736309 = as.factor(AQP5_rs3736309),
+    `anti-HCV` = as.factor(`anti-HCV`),
+    Hbs_AG = as.factor(Hbs_AG),
+    LMCA = as.factor(LMCA %>% na_if("?")),
+    Main_diagnosis_code = as.factor(Main_diagnosis_code),
+    Pneumonia = as.factor(Pneumonia),
+    Infection = as.factor(Infection),
+    CGS = as.factor(CGS),
+    Pneumonia_at_FSCCRR = as.factor(Pneumonia_at_FSCCRR),
+    Outcome = as.factor(Outcome),
+    Uroseptic_infection = as.factor(Uroseptic_infection),
+    `Sepsis/septic_shock` = as.factor(`Sepsis/septic_shock`),
+    `Ventilation` = as.factor(`Ventilation`),
+    TLR9_rs187084 = as.factor(TLR9_rs187084),
+    T_admission = as.double(T_admission),
+    across(starts_with("CCI"), as.numeric),
+    across(starts_with("CIRS-G"), as.double),
+    across(starts_with("FOUR"), as.double),
+    across(starts_with("SOFA"), as.double),
+    across(starts_with("WBC"), as.double),
+    across(starts_with("NEU"), as.double),
+    across(starts_with("LYM"), as.double),
+    across(starts_with("PLT"), as.double),
+    across(starts_with("Lactate"), as.double),
+    across(starts_with("Creatinine"), as.double),
+    across(starts_with("ALT"), as.double),
+    across(starts_with("AST"), as.double),
+    across(starts_with("Albumin"), as.double),
+    across(starts_with("Alcaline_phosphatase"), as.double),
+    across(starts_with("Uric_acid"), as.double),
+    across(starts_with("Urea"), as.double),
+    across(starts_with("GGT"), as.double),
+    across(starts_with("Potassium"), as.double),
+    across(starts_with("Sodium"), as.double),
+    across(starts_with("Chloride"), as.double),
+    across(starts_with("APTT"), as.double),
+    across(starts_with("INR"), as.double),
+    across(starts_with("Fibrinogen"), as.double),
+    across(starts_with("PT"), as.double),
+    `FSCCRR_bed-days` = as.numeric(`FSCCRR_bed-days`),
+    ICU_FSCCRR_d = as.numeric(ICU_FSCCRR_d),
+    Ventilation_d = as.numeric(Ventilation_d)
+  )
+
+cldata <- data %>% select(-c(Num, Part, Num_ref, ID, starts_with("Date"), `8ohdg_1d`, `8ohdg_5d`, `8ohdg 1d log`, `8ohdg 5d log`, Diagnosis, `FSCCRR_bed-days`, Outcome, Discharge_date_FSCCRR, Transfer_date_FSCCRR, Before_FSCCRR_d))
+
+# cldata <- cldata %>% mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .)),
+#                             across(where(is.factor), ~ ifelse(is.na(.), mode(.), .)),
+#                             across(where(is.numeric), ~ scale(.)[,1]))
+```
+
+```{r}
+set.seed(240)
+```
+
+
+PAM
+
+Assess number of potential clusters
+
+```{r}
+cldata_new <- cldata %>% select(-LMCA, -Main_diagnosis_code, -ends_with("_5d"), -ends_with("_21d"), -ends_with("_out"), -ends_with("_3d"), -ends_with("_5d_35"), -ends_with("_5d_36"), -ends_with("_5d_37"), -ends_with("_5d_38"), -ends_with("_5d_39"), -ends_with("_5d_40"), -Pneumonia_deterioration_d, -fiveday_log) %>%
+  mutate(T_admission = case_when(
+    nchar(T_admission) == 3 ~ as.double(T_admission) / 10,
+    nchar(T_admission) == 2 ~ as.double(T_admission),
+    TRUE ~ NA
+  ))
+
+slh <- c()
+slh = c(slh, NA)
+ddist <- daisy(cldata_new, metric="gower")
+for(i in 2:100){
+  pam_clusters = pam(ddist,
+                     diss = TRUE,
+                     k = i)
+  slh = c(slh ,pam_clusters$silinfo$avg.width)
+}
+plot(1:100, slh,
+     xlab = "Clusters",
+     ylab = "Silhouette Width")
+lines(1:100, slh)
+```
+
+```{r}
+pvdf <- tibble(nclusters = numeric(), Outcome = numeric(), `FSCCRR_bed-days` = numeric())
+for (i in 2:70) {
+   res <- pam(ddist, k=i, diss=T)
+   pv <- chisq.test(table(res$clustering, data$Outcome))$p.value
+   pv2 <- tidy(aov(data$`FSCCRR_bed-days`~res$clustering))$p.value[1]
+   pvdf <- pvdf %>% add_row(nclusters=i, Outcome=pv, `FSCCRR_bed-days`=pv2)
+}
+
+pvdf %>% rename(Outcome="Outcome", Days_in_clinic="FSCCRR_bed-days")
+```
+```{r}
+pam_res <- pam(ddist, k=4, diss=T)
+```
+
+
+```{r}
+ggplot(data %>% mutate(Cluster = pam_res$clustering), aes(x = Outcome, fill = factor(Cluster))) +
+  geom_bar(position = "dodge") +
+  geom_text(aes(label=Cluster, x =Outcome), stat="count", position=position_dodge(0.9)) +
+  labs(x = "Outcome", fill = "Cluster") %>% 
+  scale_x_discrete(labels = c("0" = "Alive", "1" = "Death")) %>% 
+  labs(x="Outcome", y = "Count", fill = "Cluster")
+  
+```
+```{r}
+data %>% mutate(
+  Cluster = pam_res$clustering,
+  Days = cut(`FSCCRR_bed-days`,
+                       breaks = c(-Inf, 25, 50, 75, 100, 125, 150, 175, 200, Inf),  # Интервалы
+                       labels = c("< 25", "25-50", "50-75", "75-100", "100-125", "125-150", "150-175", "175-200", "> 200"),
+                       right = TRUE)
+  ) %>% 
+  ggplot(aes(x = Days, fill = factor(Cluster))) +
+    geom_bar(position = "dodge") +
+    geom_text(aes(label=Cluster, x =Days), stat="count", position=position_dodge(0.9)) +
+    labs(x = "Days in FSCCRR", fill = "Cluster") +
+    labs(x="Days in clinic", y = "Count", fill = "Cluster")
+```
+
+```{r}
+nums <- cldata_new %>% mutate(Cluster = pam_res$clustering) %>% 
+  select(where(is.numeric)) %>% 
+  rename_with(~ str_replace_all(., "CIRS-G", "CIRS_G")) %>% 
+  rename_with(~ str_replace_all(., "_#", "")) %>% 
+  rename_with(~ str_replace_all(., "_%", "_perc")) %>% 
+  rename_with(~ str_replace_all(., "8ohdg 1d log", "OHDG8_log_1d"))
+
+for (var in colnames(nums)) {
+    formula <- as.formula(paste(var, "~", "Cluster"))
+    anova_result <- aov(formula, data = nums)
+    results <- summary(anova_result)[[1]]$`Pr(>F)`[1]
+    print(paste(results, var))
+}
+```
+```{r}
+vis_var <- c("Age", "CCI_1d", "CIRS_G_sum_1d", "CIRS_G_pathology_1d", "FOUR_1d", "SOFA_1d", "NEU_perc_1d", "LYM_perc_1d", "Ventilation_d", "Ventilation_d")
+
+for (var in vis_var) {
+  print(data %>% 
+    rename_with(~ str_replace_all(., "CIRS-G", "CIRS_G")) %>% 
+    rename_with(~ str_replace_all(., "_#", "")) %>% 
+    rename_with(~ str_replace_all(., "_%", "_perc")) %>% 
+    rename_with(~ str_replace_all(., "8ohdg 1d log", "OHDG8_log_1d")) %>% mutate(
+    Cluster = as.factor(pam_res$clustering)
+    ) %>% 
+    ggplot()+
+    geom_boxplot(aes_string(y = var, x="Cluster")))
+}
 ```
 
 ### L Patients status at FSCCRR delivery and demographics
@@ -685,10 +846,6 @@ discharged$Ventilation
 Get NUMERIC variables for day 0, demographic data, diagnosis group, and calculated NLR, DNA
 
 ```{r}
-library(factoextra)
-library(FactoMineR)
-library(ggbiplot) 
-
 #str(hosp_poly_group_nlr) 
 
 #check how many NA among chosen variables 
@@ -794,9 +951,6 @@ biplot_des_sm
 ```
 
 ```{r}
-library (plotly)
-
-
 hospital.pca <- prcomp(small_pca[,-(1:3)], 
                 scale = , rank. = 3)
 
@@ -828,9 +982,6 @@ fig
 
 
 ```{r}
-library (plotly)
-
-
 hospital.pca <- prcomp(small_pca[,-(1:3)], 
                 scale = T )
 #summary(hospital.pca)
@@ -908,12 +1059,6 @@ fig_dis
 ```
 
 ```{r}
-library(plotly)
-library(stats)
-library(MASS)
-
-
-
 hospital.pca <- prcomp(small_pca[,-(1:3)], 
                 scale = T )
 components2 <- hospital.pca[["x"]]
@@ -1035,10 +1180,6 @@ formulas  # combine each variable into formula ("outcome ~ variable of interest"
 ```
 
 ```{r warning=FALSE}
-library(broom)
-library(openxlsx)
-
-
 #regression coefficients
 tmp1 <- bind_rows(lapply(formulas, function(frml) {
  a <- tidy(glm(frml, data= discharged, family = binomial), exponentiate = TRUE, conf.int = TRUE) %>%
@@ -1088,7 +1229,6 @@ models <- formulas %>%       # add all formulas
 ```
 
 ```{r}
-library (gtsummary)
 univ_tab <- discharged %>% 
   dplyr::select(all_of(x), `Ventilation`) %>% ## select variables of interest
 
@@ -1135,52 +1275,41 @@ tmp1 %>%
   scale_x_continuous(limits = c(-1, 23))   # cut off extreme CI range
 ```
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!НЕ ИСПРАВЛЯЛА !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-Женя корреляции и логистическая регрессия
+### Correlations and logistic regression
 
 ```{r}
-library(ggplot2)
-library(reshape2)
-library(car)
 names(data)
 
-
-
 target_columns <- c(
-  "Индекс_коморбидности_Чарлсона_1d",
-  "CGS_балл",
-  "Возраст",
+  "CCI_1d",
+  "CGS",
+  "Age",
   "FOUR_1d",
   "SOFA_1d",
   "WBC_1d",
   "NEU_#_1d",
   "LYM_#_1d",
   "PLT_1d",
-  "Лактат_1d",
-  "Креатинин_1d",
-  "АЛТ_1d",
-  "АСТ_1d",
-  "Альбумин_1d",
-  "Щелочная_фосфотаза_1d",
-  "Мочевина_1d",
-  "Мочевая_кислота_1d",
-  "ГГТ_1d",
-  "Калий_1d",
-  "Натрий_1d",
-  "АЧТВ_1d",
-  "Хлорид_1d",
-  "МНО_1d",
-  "Фибриноген_1d",
-  "ПВ_1d",
+  "Lactate_1d",
+  "Creatinine_1d",
+  "ALT_1d",
+  "AST_1d",
+  "Albumin_1d",
+  "Alcaline_phosphatase_1d",
+  "Urea_1d",
+  "Uric_acid_1d",
+  "GGT_1d",
+  "Potassium_1d",
+  "Sodium_1d",
+  "APTT_1d",
+  "Chloride_1d",
+  "INR_1d",
+  "Fibrinogen_1d",
+  "PT_1d",
   "oneday_log",
   "8ohdg 1d log",
-  "ИВЛ_д"
-  
+  "Ventilation_d"
 )
-
 
 data_filtered <- data %>% select(all_of(target_columns))
 
@@ -1190,7 +1319,6 @@ data_subset_numeric <- data_filtered %>%
   select(where(is.numeric))  
 correlation_matrix <- cor(data_subset_numeric, use = "complete.obs")
 correlation_matrix
-
 
 correlation_matrix_melted <- melt(correlation_matrix)
 
@@ -1202,46 +1330,44 @@ ggplot(correlation_matrix_melted, aes(Var1, Var2, fill = value)) +
     axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),  
     axis.text.y = element_text(color = "black")  
   ) +
-  labs(title = "Матрица корреляций", x = "Переменные", y = "Переменные") -> corr_plot
+  labs(title = "Correlation Matrix", x = "Variables", y = "Variables") -> corr_plot
 
-#ggsave("C:/Users/enami/Downloads/correlation_matrix.png", plot = corr_plot, width = 10, #height = 8, bg = "white")
+#ggsave("C:/Users/enami/Downloads/correlation_matrix.png", plot = corr_plot, width = 10, height = 8, bg = "white")
 
 #data_filtered_num <- data %>%
-# mutate(across(c("Возраст", "SOFA_1d", "Индекс_коморбидности_Чарлсона_1d", 
-#                "CGS_балл", "oneday_log", "8ohdg 1d log"), as.numeric))
+# mutate(across(c("Age", "SOFA_1d", "CCI_1d", 
+#                "CGS", "oneday_log", "8ohdg 1d log"), as.numeric))
 
-data$Исход <- as.numeric(data$Исход)
+data$Outcome <- as.numeric(data$Outcome)
 #drop_na(data)
-data <- data[data$Исход %in% c(0, 1), ]
-table(data$Исход)
-str(data$Возраст)
+data <- data[data$Outcome %in% c(0, 1), ]
+table(data$Outcome)
+str(data$Age)
 data$SOFA_1d <- as.numeric(data$SOFA_1d)
-data$Индекс_коморбидности_Чарлсона_1d <-as.numeric(data$Индекс_коморбидности_Чарлсона_1d)
-data$CGS_балл<-as.numeric(data$CGS_балл)
-data$oneday_log <-as.numeric(data$oneday_log)
-data$`8ohdg 1d log` <-as.numeric(data$`8ohdg 1d log`)
-data$Возраст <- as.numeric(data$Возраст)
-model <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-               CGS_балл + oneday_log + `8ohdg 1d log`, 
+data$CCI_1d <- as.numeric(data$CCI_1d)
+data$CGS <- as.numeric(data$CGS)
+data$oneday_log <- as.numeric(data$oneday_log)
+data$`8ohdg 1d log` <- as.numeric(data$`8ohdg 1d log`)
+data$Age <- as.numeric(data$Age)
+model <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+               CGS + oneday_log + `8ohdg 1d log`, 
              data = data, 
              family = binomial)
 ######LR ratio
-data_clean <- na.omit(data[, c("Исход", "Возраст", "SOFA_1d", 
-                               "Индекс_коморбидности_Чарлсона_1d", 
-                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
+data_clean <- na.omit(data[, c("Outcome", "Age", "SOFA_1d", 
+                               "CCI_1d", 
+                               "CGS", "oneday_log", "8ohdg 1d log")])
 
-model_full <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                  CGS_балл + oneday_log + `8ohdg 1d log`, 
+model_full <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+                  CGS + oneday_log + `8ohdg 1d log`, 
                   data = data_clean, 
                   family = binomial)
-model_reduced <- glm(Исход ~ Возраст, 
+model_reduced <- glm(Outcome ~ Age, 
                      data = data_clean, 
                      family = binomial)
 lrt_result <- anova(model_reduced, model_full, test = "Chi")
 print(lrt_result)
 
-
-library(car)
 vif(model)
 vif_results <- vif(model)
 vif_results_df <- as.data.frame(vif_results)
@@ -1257,21 +1383,18 @@ logistic_results$CI_lower <- exp(logistic_results$Estimate - 1.96 * logistic_res
 logistic_results$CI_upper <- exp(logistic_results$Estimate + 1.96 * logistic_results$`Std. Error`)
 
 #install.packages("performance")
-library(performance)
-model_check <-check_model(model)
+model_check <- check_model(model)
 model_check
 #ggsave("C:/Users/enami/Downloads/model_diagnostics_plot.png", plot = model_check)
 #png("C:/Users/enami/Downloads/combined_model_diagnostics.png", width = 1200, height = 800)
 #plot(model_check)  # Рисуем графики
 #dev.off()
-library(dagitty)
+
 
 #####DAG ANALYSIS
 
 #install.packages("ggdag")
 #install.packages("dagitty")
-library(ggdag)
-library(dagitty)
 dag <- dagitty("dag {
   Outcome <- Age
   Outcome <- SOFA_1d
@@ -1290,7 +1413,6 @@ dag <- dagitty("dag {
   8hdg_1d_log -> Charlson_Index_1d
 }")
 
-
 plot(dag)
 
 dag_plot <- ggdag(dag) +
@@ -1302,35 +1424,29 @@ dag_plot <- ggdag(dag) +
   ) +
   coord_fixed(ratio = 1.5)  
 
-#ggsave("C:/Users/enami/Downloads/dag_plot.png", plot = dag_plot, width = 10, height = 8, #bg = "white")
+#ggsave("C:/Users/enami/Downloads/dag_plot.png", plot = dag_plot, width = 10, height = 8, bg = "white")
 
-model_dag <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                   CGS_балл + oneday_log + `8ohdg 1d log` +
-                   Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                   Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                   `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+model_dag <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+                   CGS + oneday_log + `8ohdg 1d log` +
+                   Age:SOFA_1d + Age:CCI_1d +
+                   Age:CGS + oneday_log:SOFA_1d + oneday_log:CCI_1d + 
+                   `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:CCI_1d, 
                  data = data, 
                  family = binomial)
 model_dag
 
-library(car)
 vif_results_dag <- vif(model_dag)
 vif_results_df_dag <- as.data.frame(vif_results_dag)
 vif_results_df_dag$Variables <- rownames(vif_results_df_dag)
 logistic_results_dag <- as.data.frame(summary(model_dag)$coefficients)
 logistic_results_dag$Variables <- rownames(logistic_results_dag)
 
-library(performance)
 model_check_dag <- check_model(model_dag)
 model_check_dag
 
 #png("C:/Users/enami/Downloads/model_dag_diagnostics_plot.png", width = 1200, height = 800)
 #plot(model_check)  
 #dev.off()
-
-
-library(ggdag)
-
 
 list(
   VIF = vif_results_df_dag,
@@ -1341,20 +1457,18 @@ list(
 #####попробую вот эту штуку центрирование – вычитание собственной средней из всех ##интервальных предикторов; приводит к осмысленному значению константы
 data_center <- data
 
-data_center$Возраст <- scale(data$Возраст, center = TRUE, scale = FALSE)
+data_center$Age <- scale(data$Age, center = TRUE, scale = FALSE)
 data_center$SOFA_1d <- scale(data$SOFA_1d, center = TRUE, scale = FALSE)
-data_center$Индекс_коморбидности_Чарлсона_1d <- scale(data$Индекс_коморбидности_Чарлсона_1d, center = TRUE, scale = FALSE)
-data_center$CGS_балл <- scale(data$CGS_балл, center = TRUE, scale = FALSE)
+data_center$CCI_1d <- scale(data$CCI_1d, center = TRUE, scale = FALSE)
+data_center$CGS <- scale(data$CGS, center = TRUE, scale = FALSE)
 data_center$oneday_log <- scale(data$oneday_log, center = TRUE, scale = FALSE)
 data_center$`8ohdg 1d log` <- scale(data$`8ohdg 1d log`, center = TRUE, scale = FALSE)
 
-
-
-model_dagcentr <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                        CGS_балл + oneday_log + `8ohdg 1d log` +
-                        Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                        Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                        `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+model_dagcentr <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+                        CGS + oneday_log + `8ohdg 1d log` +
+                        Age:SOFA_1d + Age:CCI_1d +
+                        Age:CGS + oneday_log:SOFA_1d + oneday_log:CCI_1d + 
+                        `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:CCI_1d, 
                       data = data_center, 
                       family = binomial)
 vif_results_dagcentr <- vif(model_dagcentr)
@@ -1370,7 +1484,7 @@ logistic_results_dagcentr$CI_upper <- exp(logistic_results_dagcentr$Estimate + 1
 model_check_dagcentr <- check_model(model_dagcentr)
 model_check_dagcentr
 
-#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot_scale.png", width = 1200, height #= 800)
+#png("C:/Users/enami/Downloads/model_dag_diagnostics_plot_scale.png", width = 1200, height = 800)
 #plot(model_check_dagcentr)  
 #dev.off()
 list(
@@ -1380,19 +1494,19 @@ list(
 )
 
 #####lets do the lrt again
-data_clean_center <- na.omit(data_center[, c("Исход", "Возраст", "SOFA_1d", 
-                               "Индекс_коморбидности_Чарлсона_1d", 
-                               "CGS_балл", "oneday_log", "8ohdg 1d log")])
-model_reduced_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                      CGS_балл + oneday_log + `8ohdg 1d log`, 
+data_clean_center <- na.omit(data_center[, c("Outcome", "Age", "SOFA_1d", 
+                               "CCI_1d", 
+                               "CGS", "oneday_log", "8ohdg 1d log")])
+model_reduced_combo <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+                      CGS + oneday_log + `8ohdg 1d log`, 
                     data = data_clean_center, 
                     family = binomial)
 
-model_full_combo <- glm(Исход ~ Возраст + SOFA_1d + Индекс_коморбидности_Чарлсона_1d + 
-                    CGS_балл + oneday_log + `8ohdg 1d log` +
-                    Возраст:SOFA_1d + Возраст:Индекс_коморбидности_Чарлсона_1d +
-                    Возраст:CGS_балл + oneday_log:SOFA_1d + oneday_log:Индекс_коморбидности_Чарлсона_1d + 
-                    `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:Индекс_коморбидности_Чарлсона_1d, 
+model_full_combo <- glm(Outcome ~ Age + SOFA_1d + CCI_1d + 
+                    CGS + oneday_log + `8ohdg 1d log` +
+                    Age:SOFA_1d + Age:CCI_1d +
+                    Age:CGS + oneday_log:SOFA_1d + oneday_log:CCI_1d + 
+                    `8ohdg 1d log`:SOFA_1d + `8ohdg 1d log`:CCI_1d, 
                   data = data_clean_center, 
                   family = binomial)
 
@@ -1400,37 +1514,25 @@ lrt_result_combo <- anova(model_reduced_combo, model_full_combo, test = "Chi")
 
 print(lrt_result_combo)
 ```
-
+#### Lena univariate regression for all variables:
 ```{r}
-
-```
-
-### Лена унивариантный регрессия для всех переменных:
-
-```{r}
-# подготовить такой датасет лучше где -то выше (все переменные + включить группировку, обработанные полиморфизмы и NLR)
-
-data_for_regres <- data %>% select (ID, Пол, Возраст, `анти-HCV`, `Hbs_AG`,  `ЛСМА`, Пневмония, Инфекция, diseaseGroup, CGS_балл, Индекс_коморбидности_Чарлсона_1d,`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`, `CIRS-G_индекс_тяжести_1d`, FOUR_1d, SOFA_1d, внкДНК_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`,  `PLT_1d`, `Лактат_1d`, Креатинин_1d, АЛТ_1d, АСТ_1d,  Альбумин_1d, Щелочная_фосфотаза_1d , Мочевая_кислота_1d, Мочевина_1d, ГГТ_1d, Калий_1d, Натрий_1d, Хлорид_1d,  АЧТВ_1d, МНО_1d, Фибриноген_1d, ПВ_1d, Уросептическая_инфекция, `Сепсис/септический_шок`, `Потребность_ИВЛ`, `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`, `Исход`, `Пневмония_возникшая_ФНКЦРР`, `oneday_log`, `8ohdg 1d log` ) %>% mutate(across(c(`CIRS-G_сумма_1d`, `CIRS-G_систем_с_паталогиями_5d_36`,`CIRS-G_индекс_тяжести_1d`,`FOUR_1d`, `WBC_1d`, `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`, `PLT_1d`, `Лактат_1d`, `Креатинин_1d` , `АЛТ_1d`, `АСТ_1d`, `Альбумин_1d`, `Щелочная_фосфотаза_1d`, `Мочевая_кислота_1d`, `Мочевина_1d` , `ГГТ_1d`, `Калий_1d`, `Натрий_1d`, `Хлорид_1d`, `АЧТВ_1d`, `МНО_1d`,`Фибриноген_1d`, ПВ_1d , `Ухудшение_пневмонии_сутки`, `ИВЛ_д`, `Дни_ОРИТ_ФНКЦРР`, `Койко-дни_ФНКЦРР`), as.numeric), across(c(Исход,`Потребность_ИВЛ`, factor)) 
-
+# prepare such a dataset better somewhere above (all variables + include grouping, processed polymorphisms and NLR)
+data_for_regres <- data %>% select (ID, Sex, Age, `anti-HCV`, `Hbs_AG`,  `LMCA`, Pneumonia, Infection, diseaseGroup, CGS, CCI_1d, `CIRS-G_sum_1d`, `CIRS-G_pathology_5d_36`, `CIRS-G_severity_1d`, FOUR_1d, SOFA_1d, exDNA_1d, `8ohdg_1d`, WBC_1d,  `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`,  `PLT_1d`, `Lactate_1d`, Creatinine_1d, ALT_1d, AST_1d,  Albumin_1d, Alcaline_phosphatase_1d , Uric_acid_1d, Urea_1d, GGT_1d, Potassium_1d, Sodium_1d, Chloride_1d,  APTT_1d, INR_1d, Fibrinogen_1d, PT_1d, Uroseptic_infection, `Sepsis/septic_shock`, `Ventilation`, `Pneumonia_worsening`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`, `Outcome`, `Pneumonia_at_FSCCRR`, `oneday_log`, `8ohdg 1d log` ) %>% mutate(across(c(`CIRS-G_sum_1d`, `CIRS-G_pathology_5d_36`,`CIRS-G_severity_1d`,`FOUR_1d`, `WBC_1d`, `NEU_#_1d`, `NEU_%_1d`, `LYM_#_1d`, `LYM_%_1d`, `PLT_1d`, `Lactate_1d`, `Creatinine_1d` , `ALT_1d`, `AST_1d`, `Albumin_1d`, `Alcaline_phosphatase_1d`, `Uric_acid_1d`, `Urea_1d` , `GGT_1d`, `Potassium_1d`, `Sodium_1d`, `Chloride_1d`, `APTT_1d`, `INR_1d`,`Fibrinogen_1d`, PT_1d , `Pneumonia_worsening`, `Ventilation_d`, `ICU_FSCCRR_d`, `FSCCRR_bed-days`), as.numeric), across(c(Outcome,`Ventilation`, factor)) 
 
 hosp_poly_group <- left_join(data_for_regres, hospital_polymorf[,1:11], by = "ID" )
 
 hosp_poly_group_nlr <- left_join(hosp_poly_group, NLR_data, by = "ID" ) %>% select (-ID)
 
-#Получили полный датасет, включая новые переменные и отредактированные исходные c правильным типом
+#Got a complete dataset, including new variables and edited source variables with the correct type
 summary(hosp_poly_group_nlr)
 colnames(hosp_poly_group_nlr)
 ```
 
-Построим унивариантную регрессию для [ИСХОДА]
+Let's construct a univariate regression for outcome
 
 ```{r}
-
-library(broom)
-library(openxlsx)
-
 x = names(hosp_poly_group_nlr[,-48])
-out <- unlist(lapply(48, function(n) combn(x, 1, FUN=function(row) paste0("Исход ~ ", paste0("`",row, "`",collapse = "+")))))
+out <- unlist(lapply(48, function(n) combn(x, 1, FUN=function(row) paste0("Outcome ~ ", paste0("`",row, "`",collapse = "+")))))
 out
 
 #regression coefficients
@@ -1456,69 +1558,61 @@ write.xlsx(signif_estim_univar, 'signif_estim_univar_glm.xlsx')
 #signif_results_univar<- as_data_frame(tmp2)
 #write.xlsx(signif_estim_univar, 'signif_results_univar_glm.xlsx')
 ```
-###  Лена Регрессионный анализ для поиска ассоциации:
+### Regression analysis for association finding:
 
-Проверить гипотезы о взаимодействии (для всей выборки и в стратах)
-○ Полиморфизм гена TLR9 (рецептор) и внеклеточной ДНК 
-○ Полиморфизм гена AQP4 и лейкоцитарного индекса NLR
+Test interaction hypotheses (for the whole sample and in strata)
+○ TLR9 gene (receptor) and extracellular DNA polymorphism 
+○ Polymorphism of the AQP4 gene and leucocyte NLR index
 
-##### Cвязь полиморфизма гена TLR9 (рецептор) и внеклеточной ДНК 
+##### Relationship of TLR9 gene polymorphism (receptor) and extracellular DNA 
 
 In nuclear and mitochondrial DNA, 8-hydroxy-2' -deoxyguanosine (8-OHdG) or 8-oxo-7,8-dihydro-2' -deoxyguanosine (8-oxodG) is one of the predominant forms of free radical-induced oxidative lesions, and has therefore been widely used as a biomarker for oxidative stress and carcinogenesis. Studies showed that urinary 8-OHdG is a good biomarker for risk assessment of various cancers and degenerative diseases. 
 
 ```{r}
+disease_group_id <- data %>% select (ID, Age, SOFA_1d,  diseaseGroup, oneday_log, `8ohdg 1d log`, CGS, CCI_1d, `FSCCRR_bed-days`)
 
-disease_group_id <- data %>% select (ID, Возраст, SOFA_1d,  diseaseGroup, oneday_log, `8ohdg 1d log`, CGS_балл,`Индекс_коморбидности_Чарлсона_1d`, `Койко-дни_ФНКЦРР`)
-
-
-
-#  `ИСХОД` БЕЗ ГРУППИРОВКИ
-fit_tlr <-   glm (`Исход` ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hosp_poly_group_nlr, family = binomial)
+#  `Outcome` WITHOUT GROUPING
+fit_tlr <-   glm (Outcome ~ TLR9_rs352162 :oneday_log + TLR9_rs187084 + `8ohdg 1d log`, data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr)
-# Полиморфизм/ ДНК нет значимой ассоциации предикторов с исходом (выписка, смерть)
+# Polymorphism/DNA: No significant association with outcome (discharge, death)
 
-#  `ИСХОД` C ГРУППИРОВКОЙ
-fit_tlr_gr <-   glm (`Исход` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
+#  `Outcome` WITH GROUPING
+fit_tlr_gr <-   glm (Outcome ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_gr)
-# Полиморфизм/ ДНК не ассоциированы...Последствие ЧМТ ухудшает прогноз (ур знач 0,05)
+# Polymorphism/DNA: Not associated... TBI worsens prognosis (p-value 0.05)
 
-#  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_tlr_1 <-   glm (`Потребность_ИВЛ` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
+#  `Ventilation` WITH GROUPING
+fit_tlr_1 <-   glm (Ventilation ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_tlr_1)
-# Полиморфизм/ ДНК не ассоциированы...Гипоксия ассоциирована с увеличением вероятности потребности в ИВЛ (ур знач 0,05)
+# Polymorphism/DNA: Not associated... Hypoxia increases the likelihood of ventilation need (p-value 0.05)
 
-#  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_tlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hosp_poly_group_nlr)
+#  `FSCCRR_bed-days` WITH GROUPING
+fit_tlr_2 <-   lm (FSCCRR_bed-days ~ TLR9_rs352162 + TLR9_rs187084 + oneday_log + `8ohdg 1d log` + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_tlr_2)
-# Полиморфизм/ ДНК не ассоциированы... Группа Последствие ЧМТ - положительная ассоциация с кол-вом койко-дней и отрицательная для Группы Новообразования
-
-
+# Polymorphism/DNA: Not associated... TBI group has a positive association with bed-days, while Neoplasms group has a negative association.
 ```
 
 ##### Cвязь полиморфизма гена AQP4 (рецептор) и уровня показателя NLR
 
-```{r}
-
-```
 
 ```{r}
-#  `ИСХОД` БЕЗ ГРУППИРОВКИ
-#  !!!!!! огромные std errors ??????
+#  `Outcome` WITHOUT GROUPING
+#  !!!!!! Large std errors ??????
 
-#  `ИСХОД` C ГРУППИРОВКОЙ
-fit_nlr_gr <-   glm (`Исход` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
+#  `Outcome` WITH GROUPING
+fit_nlr_gr <-   glm (Outcome ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr)
-# NLR_1 ассоциирован с исходом (эффект незначителен?), страта не ассоциирована
+# NLR_1 is associated with outcome (effect is minor?), stratum is not associated.
 
-#  `ПОТРЕБНОСТЬ В ИВЛ` C ГРУППИРОВКОЙ
-fit_nlr_gr1 <-   glm (`Потребность_ИВЛ` ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
+#  `Ventilation` WITH GROUPING
+fit_nlr_gr1 <-   glm (Ventilation ~  AQP4_rs1058427 + NLR_1d + diseaseGroup , data = hosp_poly_group_nlr, family = binomial)
 summary(fit_nlr_gr1)
-## NLR_1 ассоциирован с исходом (эффект незначителен?), новообразование?
+## NLR_1 is associated with outcome (effect is minor?), neoplasms?
 
-#  `КОЙКО-ДНИ ФНКЦРР` C ГРУППИРОВКОЙ
-fit_nlr_2 <-   lm (`Койко-дни_ФНКЦРР` ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hosp_poly_group_nlr)
+#  `FSCCRR_bed-days` WITH GROUPING
+fit_nlr_2 <-   lm (FSCCRR_bed-days ~ AQP4_rs1058427 + NLR_1d + diseaseGroup, data = hosp_poly_group_nlr)
 summary(fit_nlr_2)
-# Полиморфизм/ NLR не ассоциированы... Последствия ЧМТ?
+# Polymorphism/NLR: Not associated... TBI consequences?
 ```
 
 

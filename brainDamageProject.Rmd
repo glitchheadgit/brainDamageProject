@@ -19,6 +19,7 @@ library(SNPassoc)
 library(aod)
 library(factoextra)
 library(StatMatch)
+library(cluster)
 ```
 
 ## R Markdown
@@ -560,7 +561,8 @@ data %>%
     plot.background = element_rect(fill = "white"),
     panel.grid.major = element_line(color = "gray"),
     panel.grid.minor = element_line(color = "lightgray"),
-  )
+  ) +
+  labs(y="Number of patients", y = "Diagnosis group")
 ```
 
 ### ЛЕНА Графики состояния пациентов в точке 0
@@ -1212,8 +1214,15 @@ PAM
 Оценим количество потенциальных кластеров
 
 ```{r}
+cldata_new <- cldata %>% select(-ЛСМА, -Основной_диагноз_код_МКБ10, -ends_with("_5d"), -ends_with("_21d"), -ends_with("_out"), -ends_with("_3d"), -ends_with("_5d_35"), -ends_with("_5d_36"), -ends_with("_5d_37"), -ends_with("_5d_38"), -ends_with("_5d_39"), -ends_with("_5d_40"), -Ухудшение_пневмонии_сутки, -fiveday_log, -`8ohdg 5d log`) %>%
+  mutate(t_при_поступлении = case_when(
+    nchar(t_при_поступлении) == 3 ~ t_при_поступлении / 10,
+    TRUE ~ t_при_поступлении
+  ))
+
 slh <- c()
 slh = c(slh, NA)
+ddist <- daisy(cldata_new, metric="gower")
 for(i in 2:100){
   pam_clusters = pam(ddist,
                      diss = TRUE,
@@ -1227,20 +1236,6 @@ lines(1:100, slh)
 ```
 
 ```{r}
-ddist <- daisy(cldata, metric="gower")
-
-# PAM кластеризация
-pam_res <- pam(ddist, k = 4, diss=T)
-pam_res$data <- cldata
-pam_sil <- silhouette(pam_res$clustering, ddist)
-mean(pam_sil[, 3])
-
-fviz_cluster(pam_res)
-
-
-```
-
-```{r}
 pvdf <- tibble(nclusters = numeric(), Исход = numeric(), `Койко-дни` = numeric())
 for (i in 2:70) {
    res <- pam(ddist, k=i, diss=T)
@@ -1249,34 +1244,71 @@ for (i in 2:70) {
    pvdf <- pvdf %>% add_row(nclusters=i, Исход=pv, `Койко-дни`=pv2)
 }
 
-pvdf
+pvdf %>% rename(Outcome="Исход", Days_in_clinic="Койко-дни")
 ```
+```{r}
+pam_res <- pam(ddist, k=4, diss=T)
+```
+
+
 ```{r}
 ggplot(data %>% mutate(Cluster = pam_res$clustering), aes(x = Исход, fill = factor(Cluster))) +
   geom_bar(position = "dodge") +
   geom_text(aes(label=Cluster, x =Исход), stat="count", position=position_dodge(0.9)) +
-  labs(x = "Исход", fill = "Кластер")
+  labs(x = "Исход", fill = "Кластер") %>% 
+  scale_x_discrete(labels = c("0" = "Alive", "1" = "Death")) %>% 
+  labs(x="Outcome", y = "Count", fill = "Cluster")
+  
 ```
 ```{r}
 data %>% mutate(
   Cluster = pam_res$clustering,
   Дни = cut(`Койко-дни_ФНКЦРР`,
                        breaks = c(-Inf, 25, 50, 75, 100, 125, 150, 175, 200, Inf),  # Интервалы
-                       labels = c("меньше 25", "25-50", "50-75", "75-100", "100-125", "125-150", "150-175", "175-200", "больше 200"),
+                       labels = c("< 25", "25-50", "50-75", "75-100", "100-125", "125-150", "150-175", "175-200", "> 200"),
                        right = TRUE)
   ) %>% 
   ggplot(aes(x = Дни, fill = factor(Cluster))) +
     geom_bar(position = "dodge") +
     geom_text(aes(label=Cluster, x =Дни), stat="count", position=position_dodge(0.9)) +
-    labs(x = "Дни в ФНКЦ РР", fill = "Кластер")
+    labs(x = "Дни в ФНКЦ РР", fill = "Кластер") +
+    labs(x="Days in clinic", y = "Count", fill = "Cluster")
 ```
-
-
-Выберем количество кластеров и визуализируем результаты
 
 ```{r}
-hclusters <- cutree(hc, k=3)
-fviz_cluster(list(data=cldata, cluster=hclusters))
+nums <- cldata_new %>% mutate(Cluster = pam_res$clustering) %>% 
+  select(where(is.numeric)) %>% 
+  rename_with(~ str_replace_all(., "CIRS-G", "CIRS_G")) %>% 
+  rename_with(~ str_replace_all(., "_#", "")) %>% 
+  rename_with(~ str_replace_all(., "_%", "_perc")) %>% 
+  rename_with(~ str_replace_all(., "8ohdg 1d log", "OHDG8_log_1d"))
+
+for (var in colnames(nums)) {
+    formula <- as.formula(paste(var, "~", "Cluster"))
+    anova_result <- aov(formula, data = nums)
+    results <- summary(anova_result)[[1]]$`Pr(>F)`[1]
+    print(paste(results, var))
+}
+```
+```{r}
+vis_var <- c( "Возраст", "Индекс_коморбидности_Чарлсона_1d", "CIRS_G_сумма_1d", "CIRS_G_систем_с_паталогиями_1d", "FOUR_1d", "SOFA_1d", "NEU_perc_1d", "LYM_perc_1d", "ИВЛ_д", "ИВЛ_д")
+
+for (var in vis_var) {
+  print(data %>% 
+    rename_with(~ str_replace_all(., "CIRS-G", "CIRS_G")) %>% 
+    rename_with(~ str_replace_all(., "_#", "")) %>% 
+    rename_with(~ str_replace_all(., "_%", "_perc")) %>% 
+    rename_with(~ str_replace_all(., "8ohdg 1d log", "OHDG8_log_1d")) %>% mutate(
+    Cluster = as.factor(pam_res$clustering)
+    ) %>% 
+    ggplot()+
+    geom_boxplot(aes_string(y = var, x="Cluster")))
+}
+
+
 ```
 
+```{r}
+factors <- cldata_new <- 
+```
 
